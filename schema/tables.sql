@@ -202,6 +202,7 @@ CREATE TABLE IF NOT EXISTS "bar" (
     high TEXT NOT NULL,
     low TEXT NOT NULL,
     close TEXT NOT NULL,
+    vwap TEXT NOT NULL,
     volume TEXT NOT NULL,
     ts_event TEXT NOT NULL,
     ts_init TEXT NOT NULL,

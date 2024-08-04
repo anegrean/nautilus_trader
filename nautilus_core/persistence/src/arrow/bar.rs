@@ -39,6 +39,7 @@ impl ArrowSchemaProvider for Bar {
             Field::new("high", DataType::Int64, false),
             Field::new("low", DataType::Int64, false),
             Field::new("close", DataType::Int64, false),
+            Field::new("vwap", DataType::Int64, false),
             Field::new("volume", DataType::UInt64, false),
             Field::new("ts_event", DataType::UInt64, false),
             Field::new("ts_init", DataType::UInt64, false),
@@ -82,6 +83,7 @@ impl EncodeToRecordBatch for Bar {
         let mut high_builder = Int64Array::builder(data.len());
         let mut low_builder = Int64Array::builder(data.len());
         let mut close_builder = Int64Array::builder(data.len());
+        let mut vwap_builder = Int64Array::builder(data.len());
         let mut volume_builder = UInt64Array::builder(data.len());
         let mut ts_event_builder = UInt64Array::builder(data.len());
         let mut ts_init_builder = UInt64Array::builder(data.len());
@@ -91,6 +93,7 @@ impl EncodeToRecordBatch for Bar {
             high_builder.append_value(bar.high.raw);
             low_builder.append_value(bar.low.raw);
             close_builder.append_value(bar.close.raw);
+            vwap_builder.append_value(bar.vwap.raw);
             volume_builder.append_value(bar.volume.raw);
             ts_event_builder.append_value(bar.ts_event.as_u64());
             ts_init_builder.append_value(bar.ts_init.as_u64());
@@ -100,6 +103,7 @@ impl EncodeToRecordBatch for Bar {
         let high_array = high_builder.finish();
         let low_array = low_builder.finish();
         let close_array = close_builder.finish();
+        let vwap_array = vwap_builder.finish();
         let volume_array = volume_builder.finish();
         let ts_event_array = ts_event_builder.finish();
         let ts_init_array = ts_init_builder.finish();
@@ -111,6 +115,7 @@ impl EncodeToRecordBatch for Bar {
                 Arc::new(high_array),
                 Arc::new(low_array),
                 Arc::new(close_array),
+                Arc::new(vwap_array),
                 Arc::new(volume_array),
                 Arc::new(ts_event_array),
                 Arc::new(ts_init_array),
@@ -131,9 +136,10 @@ impl DecodeFromRecordBatch for Bar {
         let high_values = extract_column::<Int64Array>(cols, "high", 1, DataType::Int64)?;
         let low_values = extract_column::<Int64Array>(cols, "low", 2, DataType::Int64)?;
         let close_values = extract_column::<Int64Array>(cols, "close", 3, DataType::Int64)?;
-        let volume_values = extract_column::<UInt64Array>(cols, "volume", 4, DataType::UInt64)?;
-        let ts_event_values = extract_column::<UInt64Array>(cols, "ts_event", 5, DataType::UInt64)?;
-        let ts_init_values = extract_column::<UInt64Array>(cols, "ts_init", 6, DataType::UInt64)?;
+        let vwap_values = extract_column::<Int64Array>(cols, "vwap", 4, DataType::Int64)?;
+        let volume_values = extract_column::<UInt64Array>(cols, "volume", 5, DataType::UInt64)?;
+        let ts_event_values = extract_column::<UInt64Array>(cols, "ts_event", 6, DataType::UInt64)?;
+        let ts_init_values = extract_column::<UInt64Array>(cols, "ts_init", 7, DataType::UInt64)?;
 
         let result: Result<Vec<Self>, EncodingError> = (0..record_batch.num_rows())
             .map(|i| {
@@ -141,6 +147,7 @@ impl DecodeFromRecordBatch for Bar {
                 let high = Price::from_raw(high_values.value(i), price_precision);
                 let low = Price::from_raw(low_values.value(i), price_precision);
                 let close = Price::from_raw(close_values.value(i), price_precision);
+                let vwap = Price::from_raw(vwap_values.value(i), price_precision);
                 let volume = Quantity::from_raw(volume_values.value(i), size_precision);
                 let ts_event = ts_event_values.value(i).into();
                 let ts_init = ts_init_values.value(i).into();
@@ -151,6 +158,7 @@ impl DecodeFromRecordBatch for Bar {
                     high,
                     low,
                     close,
+                    vwap,
                     volume,
                     ts_event,
                     ts_init,
@@ -194,6 +202,7 @@ mod tests {
             Field::new("high", DataType::Int64, false),
             Field::new("low", DataType::Int64, false),
             Field::new("close", DataType::Int64, false),
+            Field::new("vwap", DataType::Int64, false),
             Field::new("volume", DataType::UInt64, false),
             Field::new("ts_event", DataType::UInt64, false),
             Field::new("ts_init", DataType::UInt64, false),
@@ -210,6 +219,7 @@ mod tests {
         expected_map.insert("high".to_string(), "Int64".to_string());
         expected_map.insert("low".to_string(), "Int64".to_string());
         expected_map.insert("close".to_string(), "Int64".to_string());
+        expected_map.insert("vwap".to_string(), "Int64".to_string());
         expected_map.insert("volume".to_string(), "UInt64".to_string());
         expected_map.insert("ts_event".to_string(), "UInt64".to_string());
         expected_map.insert("ts_init".to_string(), "UInt64".to_string());
@@ -227,6 +237,7 @@ mod tests {
             Price::from("102.00"),
             Price::from("100.00"),
             Price::from("101.00"),
+            Price::from("103.00"),
             Quantity::from(1100),
             1.into(),
             3.into(),
@@ -238,6 +249,7 @@ mod tests {
             Price::from("100.00"),
             Price::from("100.00"),
             Price::from("100.10"),
+            Price::from("100.00"),
             Quantity::from(1110),
             2.into(),
             4.into(),
@@ -252,11 +264,12 @@ mod tests {
         let high_values = columns[1].as_any().downcast_ref::<Int64Array>().unwrap();
         let low_values = columns[2].as_any().downcast_ref::<Int64Array>().unwrap();
         let close_values = columns[3].as_any().downcast_ref::<Int64Array>().unwrap();
-        let volume_values = columns[4].as_any().downcast_ref::<UInt64Array>().unwrap();
-        let ts_event_values = columns[5].as_any().downcast_ref::<UInt64Array>().unwrap();
-        let ts_init_values = columns[6].as_any().downcast_ref::<UInt64Array>().unwrap();
+        let vwap_values = columns[4].as_any().downcast_ref::<Int64Array>().unwrap();
+        let volume_values = columns[5].as_any().downcast_ref::<UInt64Array>().unwrap();
+        let ts_event_values = columns[6].as_any().downcast_ref::<UInt64Array>().unwrap();
+        let ts_init_values = columns[7].as_any().downcast_ref::<UInt64Array>().unwrap();
 
-        assert_eq!(columns.len(), 7);
+        assert_eq!(columns.len(), 8);
         assert_eq!(open_values.len(), 2);
         assert_eq!(open_values.value(0), 100_100_000_000);
         assert_eq!(open_values.value(1), 100_000_000_000);
@@ -269,6 +282,9 @@ mod tests {
         assert_eq!(close_values.len(), 2);
         assert_eq!(close_values.value(0), 101_000_000_000);
         assert_eq!(close_values.value(1), 100_100_000_000);
+        assert_eq!(vwap_values.len(), 2);
+        assert_eq!(vwap_values.value(0), 103_000_000_000);
+        assert_eq!(vwap_values.value(1), 100_000_000_000);
         assert_eq!(volume_values.len(), 2);
         assert_eq!(volume_values.value(0), 1_100_000_000_000);
         assert_eq!(volume_values.value(1), 1_110_000_000_000);
@@ -289,6 +305,7 @@ mod tests {
         let high = Int64Array::from(vec![102_000_000_000, 10_000_000_000]);
         let low = Int64Array::from(vec![100_000_000_000, 10_000_000_000]);
         let close = Int64Array::from(vec![101_000_000_000, 10_010_000_000]);
+        let vwap = Int64Array::from(vec![101_000_000_000, 10_010_000_000]);
         let volume = UInt64Array::from(vec![11_000_000_000, 10_000_000_000]);
         let ts_event = UInt64Array::from(vec![1, 2]);
         let ts_init = UInt64Array::from(vec![3, 4]);
@@ -300,6 +317,7 @@ mod tests {
                 Arc::new(high),
                 Arc::new(low),
                 Arc::new(close),
+                Arc::new(vwap),
                 Arc::new(volume),
                 Arc::new(ts_event),
                 Arc::new(ts_init),

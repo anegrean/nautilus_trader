@@ -912,6 +912,8 @@ cdef class Bar(Data):
         The bars low price.
     close : Price
         The bars close price.
+    vwap : Price
+        The bars volume-weighed average price.
     volume : Quantity
         The bars volume.
     ts_event : uint64_t
@@ -939,6 +941,7 @@ cdef class Bar(Data):
         Price high not None,
         Price low not None,
         Price close not None,
+        Price vwap not None,
         Quantity volume not None,
         uint64_t ts_event,
         uint64_t ts_init,
@@ -956,6 +959,7 @@ cdef class Bar(Data):
             high._mem,
             low._mem,
             close._mem,
+            vwap._mem,
             volume._mem,
             ts_event,
             ts_init,
@@ -971,6 +975,7 @@ cdef class Bar(Data):
             self._mem.high.raw,
             self._mem.low.raw,
             self._mem.close.raw,
+            self._mem.vwap.raw,
             self._mem.close.precision,
             self._mem.volume.raw,
             self._mem.volume.precision,
@@ -979,7 +984,7 @@ cdef class Bar(Data):
         )
 
     def __setstate__(self, state):
-        if len(state) == 14:
+        if len(state) == 15:
             instrument_id = InstrumentId.from_str_c(state[0])
 
             self._mem = bar_new_from_raw(
@@ -1001,6 +1006,7 @@ cdef class Bar(Data):
                 state[11],
                 state[12],
                 state[13],
+                state[14],
             )
         else:
             instrument_id = InstrumentId.from_str_c(state[0])
@@ -1028,6 +1034,7 @@ cdef class Bar(Data):
                 state[14],
                 state[15],
                 state[16],
+                state[17],
             )
 
     def __eq__(self, Bar other) -> bool:
@@ -1106,6 +1113,18 @@ cdef class Bar(Data):
         return Price.from_raw_c(self._mem.close.raw, self._mem.close.precision)
 
     @property
+    def vwap(self) -> Price:
+        """
+        Return the volume-weighed average price of the bar.
+
+        Returns
+        -------
+        Price
+
+        """
+        return Price.from_raw_c(self._mem.vwap.raw, self._mem.vwap.precision)
+
+    @property
     def volume(self) -> Quantity:
         """
         Return the volume of the bar.
@@ -1152,6 +1171,7 @@ cdef class Bar(Data):
         int64_t high,
         int64_t low,
         int64_t close,
+        int64_t vwap,
         uint8_t price_prec,
         uint64_t volume,
         uint8_t size_prec,
@@ -1165,6 +1185,7 @@ cdef class Bar(Data):
             high,
             low,
             close,
+            vwap,
             price_prec,
             volume,
             size_prec,
@@ -1182,13 +1203,14 @@ cdef class Bar(Data):
         int64_t[:] highs,
         int64_t[:] lows,
         int64_t[:] closes,
+        int64_t[:] vwaps,
         uint64_t[:] volumes,
         uint64_t[:] ts_events,
         uint64_t[:] ts_inits,
     ):
         Condition.true(
             len(opens) == len(highs) == len(lows) == len(lows) ==
-            len(closes) == len(volumes) == len(ts_events) == len(ts_inits),
+            len(closes) == len(vwaps) == len(volumes) == len(ts_events) == len(ts_inits),
             "Array lengths must be equal",
         )
 
@@ -1206,6 +1228,7 @@ cdef class Bar(Data):
                 highs[i],
                 lows[i],
                 closes[i],
+                vwaps[i],
                 price_prec,
                 volumes[i],
                 size_prec,
@@ -1224,6 +1247,7 @@ cdef class Bar(Data):
         int64_t[:] opens,
         int64_t[:] highs,
         int64_t[:] lows,
+        int64_t[:] vwaps,
         int64_t[:] closes,
         uint64_t[:] volumes,
         uint64_t[:] ts_events,
@@ -1236,6 +1260,7 @@ cdef class Bar(Data):
             opens,
             highs,
             lows,
+            vwaps,
             closes,
             volumes,
             ts_events,
@@ -1251,6 +1276,7 @@ cdef class Bar(Data):
             high=Price.from_str_c(values["high"]),
             low=Price.from_str_c(values["low"]),
             close=Price.from_str_c(values["close"]),
+            vwap=Price.from_str_c(values["vwap"]),
             volume=Quantity.from_str_c(values["volume"]),
             ts_event=values["ts_event"],
             ts_init=values["ts_init"],
@@ -1266,6 +1292,7 @@ cdef class Bar(Data):
             "high": str(obj.high),
             "low": str(obj.low),
             "close": str(obj.close),
+            "vwap": str(obj.vwap),
             "volume": str(obj.volume),
             "ts_event": obj._mem.ts_event,
             "ts_init": obj._mem.ts_init,
@@ -1286,6 +1313,7 @@ cdef class Bar(Data):
         int64_t high,
         int64_t low,
         int64_t close,
+        int64_t vwap,
         uint8_t price_prec,
         uint64_t volume,
         uint8_t size_prec,
@@ -1298,6 +1326,7 @@ cdef class Bar(Data):
             high,
             low,
             close,
+            vwap,
             price_prec,
             volume,
             size_prec,
@@ -1371,6 +1400,7 @@ cdef class Bar(Data):
                 nautilus_pyo3.Price.from_raw(bar._mem.high.raw, price_prec),
                 nautilus_pyo3.Price.from_raw(bar._mem.low.raw, price_prec),
                 nautilus_pyo3.Price.from_raw(bar._mem.close.raw, price_prec),
+                nautilus_pyo3.Price.from_raw(bar._mem.vwap.raw, price_prec),
                 nautilus_pyo3.Quantity.from_raw(bar._mem.volume.raw, volume_prec),
                 bar._mem.ts_event,
                 bar._mem.ts_init,
@@ -1433,6 +1463,7 @@ cdef class Bar(Data):
             nautilus_pyo3.Price.from_raw(self._mem.high.raw, self._mem.high.precision),
             nautilus_pyo3.Price.from_raw(self._mem.low.raw, self._mem.low.precision),
             nautilus_pyo3.Price.from_raw(self._mem.close.raw, self._mem.close.precision),
+            nautilus_pyo3.Price.from_raw(self._mem.vwap.raw, self._mem.vwap.precision),
             nautilus_pyo3.Quantity.from_raw(self._mem.volume.raw, self._mem.volume.precision),
             self._mem.ts_event,
             self._mem.ts_init,
@@ -1440,7 +1471,7 @@ cdef class Bar(Data):
 
     cpdef bint is_single_price(self):
         """
-        If the OHLC are all equal to a single price.
+        If the OHLC and VWAP are all equal to a single price.
 
         Returns
         -------

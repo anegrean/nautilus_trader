@@ -1197,6 +1197,10 @@ typedef struct Bar_t {
      */
     struct Price_t close;
     /**
+     * The bars volume-weighted average price.
+     */
+    struct Price_t vwap;
+    /**
      * The bars volume.
      */
     struct Quantity_t volume;
@@ -1582,6 +1586,7 @@ struct Bar_t bar_new(struct BarType_t bar_type,
                      struct Price_t high,
                      struct Price_t low,
                      struct Price_t close,
+                     struct Price_t vwap,
                      struct Quantity_t volume,
                      uint64_t ts_event,
                      uint64_t ts_init);
@@ -1591,6 +1596,7 @@ struct Bar_t bar_new_from_raw(struct BarType_t bar_type,
                               int64_t high,
                               int64_t low,
                               int64_t close,
+                              int64_t vwap,
                               uint8_t price_prec,
                               uint64_t volume,
                               uint8_t size_prec,

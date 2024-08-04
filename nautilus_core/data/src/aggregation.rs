@@ -41,7 +41,7 @@ use nautilus_model::{
 pub trait BarAggregator {
     /// The [`BarType`] to be aggregated.
     fn bar_type(&self) -> BarType;
-    /// Updates theaggregator  with the given price and size.
+    /// Updates the aggregator with the given price and size.
     fn update(&mut self, price: Price, size: Quantity, ts_event: UnixNanos);
     /// Updates the aggregator with the given quote.
     fn handle_quote_tick(&mut self, quote: QuoteTick) {
@@ -63,6 +63,7 @@ pub trait BarAggregator {
 pub struct BarBuilder {
     bar_type: BarType,
     size_precision: u8,
+    price_precision: u8,
     initialized: bool,
     ts_last: UnixNanos,
     count: usize,
@@ -72,6 +73,7 @@ pub struct BarBuilder {
     high: Option<Price>,
     low: Option<Price>,
     close: Option<Price>,
+    vwap: Option<Price>,
     volume: Quantity,
 }
 
@@ -103,6 +105,7 @@ impl BarBuilder {
         Self {
             bar_type,
             size_precision: instrument.size_precision(),
+            price_precision: instrument.price_precision(),
             initialized: false,
             ts_last: UnixNanos::default(),
             count: 0,
@@ -112,6 +115,7 @@ impl BarBuilder {
             high: None,
             low: None,
             close: None,
+            vwap: None,
             volume: Quantity::zero(instrument.size_precision()),
         }
     }
@@ -134,6 +138,10 @@ impl BarBuilder {
 
         if self.close.is_none() {
             self.close = Some(partial_bar.close);
+        }
+
+        if self.vwap.is_none() {
+            self.vwap = Some(partial_bar.vwap);
         }
 
         self.volume = partial_bar.volume;
@@ -167,6 +175,16 @@ impl BarBuilder {
         }
 
         self.close = Some(price);
+
+        if self.vwap.is_none() {
+            self.vwap = Some(price);
+        } else {
+            let vwap: Price = self.vwap.unwrap();
+            let size_total: Quantity = self.volume.add(size);
+            let vwap_val: f64 = (vwap.as_f64()*self.volume.as_f64()+price.as_f64()*size.as_f64())/size_total.as_f64();
+            self.vwap = Some(Price::new(vwap_val, self.price_precision).unwrap());
+        }
+
         self.volume = self.volume.add(size);
         self.count += 1;
         self.ts_last = ts_event;
@@ -179,6 +197,7 @@ impl BarBuilder {
         self.open = None;
         self.high = None;
         self.low = None;
+        self.vwap = None;
         self.volume = Quantity::zero(self.size_precision);
         self.count = 0;
     }
@@ -195,6 +214,7 @@ impl BarBuilder {
             self.high = self.last_close;
             self.low = self.last_close;
             self.close = self.last_close;
+            self.vwap = self.last_close;
         }
 
         // SAFETY: The open was checked, so we can assume all prices are Some
@@ -204,6 +224,7 @@ impl BarBuilder {
             self.high.unwrap(),
             self.low.unwrap(),
             self.close.unwrap(),
+            self.vwap.unwrap(),
             self.volume,
             ts_event,
             ts_init,
@@ -630,11 +651,12 @@ mod tests {
 
         let partial_bar = Bar::new(
             bar_type,
-            Price::new(1.00001, 8),
-            Price::new(1.00010, 8),
-            Price::new(1.00000, 8),
-            Price::new(1.00002, 8),
-            Quantity::new(1.0, 0),
+            Price::new(1.00001, 8).unwrap(),
+            Price::new(1.00010, 8).unwrap(),
+            Price::new(1.00000, 8).unwrap(),
+            Price::new(1.00002, 8).unwrap(),
+            Price::new(1.00006, 8).unwrap(),
+            Quantity::new(1.0, 0).unwrap(),
             UnixNanos::from(1_000_000_000),
             UnixNanos::from(2_000_000_000),
         )
@@ -643,11 +665,12 @@ mod tests {
         builder.set_partial(partial_bar);
         let bar = builder.build_now();
 
-        assert_eq!(bar.open, Price::new(1.00001, 8));
-        assert_eq!(bar.high, Price::new(1.00010, 8));
-        assert_eq!(bar.low, Price::new(1.00000, 8));
-        assert_eq!(bar.close, Price::new(1.00002, 8));
-        assert_eq!(bar.volume, Quantity::new(1.0, 0));
+        assert_eq!(bar.open, Price::new(1.00001, 8).unwrap());
+        assert_eq!(bar.high, Price::new(1.00010, 8).unwrap());
+        assert_eq!(bar.low, Price::new(1.00000, 8).unwrap());
+        assert_eq!(bar.close, Price::new(1.00002, 8).unwrap());
+        assert_eq!(bar.vwap, Price::new(1.00006, 8).unwrap());
+        assert_eq!(bar.volume, Quantity::new(1.0, 0).unwrap());
         assert_eq!(bar.ts_init, 2_000_000_000);
         assert_eq!(builder.ts_last, 2_000_000_000);
     }
@@ -664,11 +687,12 @@ mod tests {
 
         let partial_bar1 = Bar::new(
             bar_type,
-            Price::new(1.00001, 8),
-            Price::new(1.00010, 8),
-            Price::new(1.00000, 8),
-            Price::new(1.00002, 8),
-            Quantity::new(1.0, 0),
+            Price::new(1.00001, 8).unwrap(),
+            Price::new(1.00010, 8).unwrap(),
+            Price::new(1.00000, 8).unwrap(),
+            Price::new(1.00002, 8).unwrap(),
+            Price::new(1.00006, 8).unwrap(),
+            Quantity::new(1.0, 0).unwrap(),
             UnixNanos::from(1_000_000_000),
             UnixNanos::from(1_000_000_000),
         )
@@ -676,11 +700,12 @@ mod tests {
 
         let partial_bar2 = Bar::new(
             bar_type,
-            Price::new(2.00001, 8),
-            Price::new(2.00010, 8),
-            Price::new(2.00000, 8),
-            Price::new(2.00002, 8),
-            Quantity::new(2.0, 0),
+            Price::new(2.00001, 8).unwrap(),
+            Price::new(2.00010, 8).unwrap(),
+            Price::new(2.00000, 8).unwrap(),
+            Price::new(2.00002, 8).unwrap(),
+            Price::new(2.00006, 8).unwrap(),
+            Quantity::new(2.0, 0).unwrap(),
             UnixNanos::from(3_000_000_000),
             UnixNanos::from(3_000_000_000),
         )
@@ -693,11 +718,12 @@ mod tests {
             UnixNanos::from(4_000_000_000),
         );
 
-        assert_eq!(bar.open, Price::new(1.00001, 8));
-        assert_eq!(bar.high, Price::new(1.00010, 8));
-        assert_eq!(bar.low, Price::new(1.00000, 8));
-        assert_eq!(bar.close, Price::new(1.00002, 8));
-        assert_eq!(bar.volume, Quantity::new(1.0, 0));
+        assert_eq!(bar.open, Price::new(1.00001, 8).unwrap());
+        assert_eq!(bar.high, Price::new(1.00010, 8).unwrap());
+        assert_eq!(bar.low, Price::new(1.00000, 8).unwrap());
+        assert_eq!(bar.close, Price::new(1.00002, 8).unwrap());
+        assert_eq!(bar.vwap, Price::new(1.00006, 8).unwrap());
+        assert_eq!(bar.volume, Quantity::new(1.0, 0).unwrap());
         assert_eq!(bar.ts_init, 4_000_000_000);
         assert_eq!(builder.ts_last, 1_000_000_000);
     }
@@ -813,11 +839,12 @@ mod tests {
 
         let bar = builder.build_now();
 
-        assert_eq!(bar.open, Price::new(1.00001, 8));
-        assert_eq!(bar.high, Price::new(1.00002, 8));
-        assert_eq!(bar.low, Price::new(1.00000, 8));
-        assert_eq!(bar.close, Price::new(1.00000, 8));
-        assert_eq!(bar.volume, Quantity::new(5.0, 0));
+        assert_eq!(bar.open, Price::new(1.00001, 8).unwrap());
+        assert_eq!(bar.high, Price::new(1.00002, 8).unwrap());
+        assert_eq!(bar.low, Price::new(1.00000, 8).unwrap());
+        assert_eq!(bar.close, Price::new(1.00000, 8).unwrap());
+        assert_eq!(bar.vwap, Price::new(1.000012, 8).unwrap());
+        assert_eq!(bar.volume, Quantity::new(5.0, 0).unwrap());
         assert_eq!(bar.ts_init, 1_000_000_000);
         assert_eq!(builder.ts_last, 1_000_000_000);
         assert_eq!(builder.count, 0);
@@ -858,11 +885,12 @@ mod tests {
 
         let bar = builder.build_now();
 
-        assert_eq!(bar.open, Price::new(1.00000, 8));
-        assert_eq!(bar.high, Price::new(1.00003, 8));
-        assert_eq!(bar.low, Price::new(1.00000, 8));
-        assert_eq!(bar.close, Price::new(1.00002, 8));
-        assert_eq!(bar.volume, Quantity::new(3.0, 0));
+        assert_eq!(bar.open, Price::new(1.00000, 8).unwrap());
+        assert_eq!(bar.high, Price::new(1.00003, 8).unwrap());
+        assert_eq!(bar.low, Price::new(1.00000, 8).unwrap());
+        assert_eq!(bar.close, Price::new(1.00002, 8).unwrap());
+        assert_eq!(bar.vwap, Price::new(1.0000166666666667, 8).unwrap());
+        assert_eq!(bar.volume, Quantity::new(3.0, 0).unwrap());
     }
 
     // #[rstest]

@@ -87,6 +87,7 @@ class BinanceBar(Bar):
             high=high,
             low=low,
             close=close,
+            vwap=Price.from_int_c(0), # set to 0 for now, not sure if this venue provides VWAP for bars
             volume=volume,
             ts_event=ts_event,
             ts_init=ts_init,
@@ -111,13 +112,13 @@ class BinanceBar(Bar):
         )
 
     def __setstate__(self, state):
-        super().__setstate__(state[:14])
-        self.quote_volume = Decimal(state[14])
-        self.count = state[15]
-        self.taker_buy_base_volume = Decimal(state[16])
-        self.taker_buy_quote_volume = Decimal(state[17])
-        self.taker_sell_base_volume = Decimal(state[18])
-        self.taker_sell_quote_volume = Decimal(state[19])
+        super().__setstate__(state[:15])
+        self.quote_volume = Decimal(state[15])
+        self.count = state[16]
+        self.taker_buy_base_volume = Decimal(state[17])
+        self.taker_buy_quote_volume = Decimal(state[18])
+        self.taker_sell_base_volume = Decimal(state[19])
+        self.taker_sell_quote_volume = Decimal(state[20])
 
     def __repr__(self) -> str:
         return (
@@ -127,6 +128,7 @@ class BinanceBar(Bar):
             f"high={self.high}, "
             f"low={self.low}, "
             f"close={self.close}, "
+            f"vwap={self.vwap}, "
             f"volume={self.volume}, "
             f"quote_volume={self.quote_volume}, "
             f"count={self.count}, "

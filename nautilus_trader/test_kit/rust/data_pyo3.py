@@ -189,6 +189,7 @@ class TestDataProviderPyo3:
             high=Price.from_str("1.00004"),
             low=Price.from_str("1.00001"),
             close=Price.from_str("1.00003"),
+            vwap=Price.from_str("1.00006"),
             volume=Quantity.from_int(1_000_000),
             ts_event=0,
             ts_init=0,

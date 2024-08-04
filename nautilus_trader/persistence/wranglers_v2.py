@@ -477,9 +477,14 @@ class BarDataWranglerV2(WranglerBase):
         df["low"] = (df["low"] * 1e9).astype(pd.Int64Dtype())
         df["close"] = (df["close"] * 1e9).astype(pd.Int64Dtype())
 
+        if "vwap" in df.columns:
+            df["vwap"] = (df["vwap"] * 1e9).astype(pd.Int64Dtype())
+        else:
+            df["vwap"] = 0
+
         if "volume" not in df.columns:
             df["volume"] = pd.Series([default_volume * 1e9] * len(df), dtype=pd.UInt64Dtype())
-
+        
         # Process timestamps
         df["ts_event"] = (
             pd.to_datetime(df["ts_event"], utc=True, format="mixed")
@@ -499,7 +504,7 @@ class BarDataWranglerV2(WranglerBase):
             df["ts_init"] = df["ts_event"] + ts_init_delta
 
         # Reorder the columns and drop index column
-        df = df[["open", "high", "low", "close", "volume", "ts_event", "ts_init"]]
+        df = df[["open", "high", "low", "close", "vwap", "volume", "ts_event", "ts_init"]]
         df = df.reset_index(drop=True)
 
         table = pa.Table.from_pandas(df)

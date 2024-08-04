@@ -735,6 +735,7 @@ pub fn decode_ohlcv_msg(
         Price::from_raw(msg.high, price_precision),
         Price::from_raw(msg.low, price_precision),
         Price::from_raw(msg.close, price_precision),
+        Price::from_raw(0, price_precision), // OHLCV bars do not have a VWAP
         Quantity::from_raw(msg.volume * FIXED_SCALAR as u64, 0),
         ts_event,
         ts_init,

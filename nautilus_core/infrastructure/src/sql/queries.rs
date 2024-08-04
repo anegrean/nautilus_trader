@@ -670,15 +670,15 @@ impl DatabaseQueries {
         println!("Adding bar: {:?}", bar);
         sqlx::query(r#"
             INSERT INTO "bar" (
-                instrument_id, step, bar_aggregation, price_type, aggregation_source, open, high, low, close, volume, ts_event, ts_init, created_at, updated_at
+                instrument_id, step, bar_aggregation, price_type, aggregation_source, open, high, low, close, vwap, volume, ts_event, ts_init, created_at, updated_at
             ) VALUES (
-                $1, $2, $3::bar_aggregation, $4::price_type, $5::aggregation_source, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                $1, $2, $3::bar_aggregation, $4::price_type, $5::aggregation_source, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             )
             ON CONFLICT (id)
             DO UPDATE
             SET
                 instrument_id = $1, step = $2, bar_aggregation = $3::bar_aggregation, price_type = $4::price_type, aggregation_source = $5::aggregation_source,
-                open = $6, high = $7, low = $8, close = $9, volume = $10, ts_event = $11, ts_init = $12, updated_at = CURRENT_TIMESTAMP
+                open = $6, high = $7, low = $8, close = $9, vwap = $10, volume = $11, ts_event = $12, ts_init = $13, updated_at = CURRENT_TIMESTAMP
         "#)
             .bind(bar.bar_type.instrument_id().to_string())
             .bind(bar.bar_type.spec().step as i32)
@@ -689,6 +689,7 @@ impl DatabaseQueries {
             .bind(bar.high.to_string())
             .bind(bar.low.to_string())
             .bind(bar.close.to_string())
+            .bind(bar.vwap.to_string())
             .bind(bar.volume.to_string())
             .bind(bar.ts_event.to_string())
             .bind(bar.ts_init.to_string())

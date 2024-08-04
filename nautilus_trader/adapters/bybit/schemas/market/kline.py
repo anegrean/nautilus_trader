@@ -45,6 +45,7 @@ class BybitKline(msgspec.Struct, array_like=True):
             high=Price.from_str(self.highPrice),
             low=Price.from_str(self.lowPrice),
             close=Price.from_str(self.closePrice),
+            vwap=Price.from_int_c(0), # set to 0 for now, if not available
             volume=Quantity.from_str(self.volume),
             ts_event=millis_to_nanos(int(self.startTime)),
             ts_init=ts_init,

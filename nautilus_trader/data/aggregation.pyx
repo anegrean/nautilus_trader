@@ -76,7 +76,9 @@ cdef class BarBuilder:
         self._high = None
         self._low = None
         self._close = None
+        self._vwap = None
         self.volume = Quantity.zero_c(precision=self.size_precision)
+        
 
     def __repr__(self) -> str:
         return (
@@ -86,7 +88,9 @@ cdef class BarBuilder:
             f"{self._high},"
             f"{self._low},"
             f"{self._close},"
+            f"{self._vwap},"
             f"{self.volume})"
+            
         )
 
     cpdef void set_partial(self, Bar partial_bar):
@@ -115,8 +119,11 @@ cdef class BarBuilder:
         if self._close is None:
             self._close = partial_bar.close
 
-        self.volume = partial_bar.volume
+        if self._vwap is None:
+            self._vwap = partial_bar.vwap
 
+        self.volume = partial_bar.volume
+        
         if self.ts_last == 0:
             self.ts_last = partial_bar.ts_init
 
@@ -156,7 +163,14 @@ cdef class BarBuilder:
             self._low = price
 
         self._close = price
+        
+        if self._vwap is None:
+            self._vwap = price
+        else:
+            self._vwap._mem.raw = (self._vwap._mem.raw * self.volume._mem.raw + price._mem.raw * size._mem.raw)/(self.volume._mem.raw+size._mem.raw)
+
         self.volume._mem.raw += size._mem.raw
+        
         self.count += 1
         self.ts_last = ts_event
 
@@ -203,8 +217,10 @@ cdef class BarBuilder:
         self._open = None
         self._high = None
         self._low = None
+        self._vwap = None
 
         self.volume = Quantity.zero_c(precision=self.size_precision)
+        
         self.count = 0
 
     cpdef Bar build_now(self):
@@ -239,6 +255,7 @@ cdef class BarBuilder:
             self._high = self._last_close
             self._low = self._last_close
             self._close = self._last_close
+            self._vwap = self._last_close
 
         cdef Bar bar = Bar(
             bar_type=self._bar_type,
@@ -246,6 +263,7 @@ cdef class BarBuilder:
             high=self._high,
             low=self._low,
             close=self._close,
+            vwap=self._vwap,
             volume=Quantity(self.volume, self.size_precision),
             ts_event=ts_event,
             ts_init=ts_init,

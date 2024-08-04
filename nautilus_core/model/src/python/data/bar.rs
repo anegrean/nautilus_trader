@@ -190,6 +190,11 @@ impl Bar {
         let close_raw: i64 = close_py.getattr("raw")?.extract()?;
         let close = Price::from_raw(close_raw, price_prec);
 
+        let vwap_py: &PyAny = obj.getattr("vwap")?;
+        let vwap_raw: i64 = close_py.getattr("raw")?.extract()?;
+        let vwap = Price::from_raw(vwap_raw, price_prec).map_err(to_pyvalue_err)?;
+
+
         let volume_py: &PyAny = obj.getattr("volume")?;
         let volume_raw: u64 = volume_py.getattr("raw")?.extract()?;
         let volume_prec: u8 = volume_py.getattr("precision")?.extract()?;
@@ -204,6 +209,7 @@ impl Bar {
             high,
             low,
             close,
+            vwap,
             volume,
             ts_event.into(),
             ts_init.into(),
@@ -222,6 +228,7 @@ impl Bar {
         high: Price,
         low: Price,
         close: Price,
+        vwap: Price,
         volume: Quantity,
         ts_event: u64,
         ts_init: u64,
@@ -232,6 +239,7 @@ impl Bar {
             high,
             low,
             close,
+            vwap,
             volume,
             ts_event.into(),
             ts_init.into(),
@@ -289,6 +297,12 @@ impl Bar {
     #[pyo3(name = "close")]
     fn py_close(&self) -> Price {
         self.close
+    }
+
+    #[getter]
+    #[pyo3(name = "vwap")]
+    fn py_vwap(&self) -> Price {
+        self.vwap
     }
 
     #[getter]
@@ -423,7 +437,7 @@ mod tests {
 
         Python::with_gil(|py| {
             let dict_string = bar.py_as_dict(py).unwrap().to_string();
-            let expected_string = r"{'type': 'Bar', 'bar_type': 'AUDUSD.SIM-1-MINUTE-LAST-INTERNAL', 'open': '1.00010', 'high': '1.00020', 'low': '1.00000', 'close': '1.00010', 'volume': '100000', 'ts_event': 0, 'ts_init': 0}";
+            let expected_string = r"{'type': 'Bar', 'bar_type': 'AUDUSD.SIM-1-MINUTE-LAST-INTERNAL', 'open': '1.00010', 'high': '1.00020', 'low': '1.00000', 'close': '1.00010', 'vwap': '1.00015', 'volume': '100000', 'ts_event': 0, 'ts_init': 0}";
             assert_eq!(dict_string, expected_string);
         });
     }
