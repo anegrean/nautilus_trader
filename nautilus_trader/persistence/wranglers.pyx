@@ -845,6 +845,9 @@ cdef class BarDataWrangler:
 
         data = as_utc_index(data)
 
+        if "vwap" not in data:
+            data["vwap"] = 0.0
+
         if "volume" not in data:
             data["volume"] = float(default_volume)
         

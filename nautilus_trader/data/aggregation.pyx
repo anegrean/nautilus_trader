@@ -78,6 +78,7 @@ cdef class BarBuilder:
         self._close = None
         self._vwap = None
         self.volume = Quantity.zero_c(precision=self.size_precision)
+        
 
     def __repr__(self) -> str:
         return (
