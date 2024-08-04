@@ -103,6 +103,7 @@ pub fn bar_ethusdt_binance_minute_bid(#[default("1522")] close_price: &str) -> B
         high: Price::from("1550.0"),
         low: Price::from("1495.0"),
         close: Price::from(close_price),
+        vwap: Price::from("1520.0"),
         volume: Quantity::from("100000"),
         ts_event: 0.into(),
         ts_init: 1.into(),

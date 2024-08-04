@@ -92,6 +92,7 @@ class BybitWsKline(msgspec.Struct):
             high=Price.from_str(self.high),
             low=Price.from_str(self.low),
             close=Price.from_str(self.close),
+            vwap=Price.from_int_c(0), # set to 0 for now, if not available
             volume=Quantity.from_str(self.volume),
             ts_event=millis_to_nanos(int(self.end) + 1),
             ts_init=ts_init,

@@ -573,6 +573,7 @@ class TestCachePostgresAdapter:
             high=Price.from_str("1505.00"),
             low=Price.from_str("1490.00"),
             close=Price.from_str("1502.00"),
+            vwap=Price.from_str("1501.00"),
             volume=Quantity.from_int(2_000),
             ts_event=1,
             ts_init=2,
@@ -589,6 +590,7 @@ class TestCachePostgresAdapter:
         assert target_bar.close == bar.close
         assert target_bar.low == bar.low
         assert target_bar.high == bar.high
+        assert target_bar.vwap == bar.vwap
         assert target_bar.volume == bar.volume
         assert target_bar.ts_init == bar.ts_init
         assert target_bar.ts_event == bar.ts_event

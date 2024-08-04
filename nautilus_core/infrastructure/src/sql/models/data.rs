@@ -140,6 +140,9 @@ impl<'r> FromRow<'r, PgRow> for BarModel {
         let close = row
             .try_get::<&str, _>("close")
             .map(|x| Price::from_str(x).unwrap())?;
+        let vwap = row
+            .try_get::<&str, _>("vwap")
+            .map(|x| Price::from_str(x).unwrap())?;
         let volume = row
             .try_get::<&str, _>("volume")
             .map(|x| Quantity::from_str(x).unwrap())?;
@@ -149,7 +152,7 @@ impl<'r> FromRow<'r, PgRow> for BarModel {
         let ts_init = row
             .try_get::<String, _>("ts_init")
             .map(|res| UnixNanos::from(res.as_str()))?;
-        let bar = Bar::new(bar_type, open, high, low, close, volume, ts_event, ts_init).unwrap();
+        let bar = Bar::new(bar_type, open, high, low, close, vwap, volume, ts_event, ts_init).unwrap();
         Ok(BarModel(bar))
     }
 }

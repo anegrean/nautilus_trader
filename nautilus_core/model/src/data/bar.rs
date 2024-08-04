@@ -289,6 +289,8 @@ pub struct Bar {
     pub low: Price,
     /// The bars close price.
     pub close: Price,
+    /// The bars volume-weighted average price.
+    pub vwap: Price,
     /// The bars volume.
     pub volume: Quantity,
     /// UNIX timestamp (nanoseconds) when the data event occurred.
@@ -306,6 +308,7 @@ impl Bar {
         high: Price,
         low: Price,
         close: Price,
+        vwap: Price,
         volume: Quantity,
         ts_event: UnixNanos,
         ts_init: UnixNanos,
@@ -316,6 +319,7 @@ impl Bar {
             high,
             low,
             close,
+            vwap,
             volume,
             ts_event,
             ts_init,
@@ -346,6 +350,7 @@ impl Bar {
         metadata.insert("high".to_string(), "Int64".to_string());
         metadata.insert("low".to_string(), "Int64".to_string());
         metadata.insert("close".to_string(), "Int64".to_string());
+        metadata.insert("vwap".to_string(), "Int64".to_string());
         metadata.insert("volume".to_string(), "UInt64".to_string());
         metadata.insert("ts_event".to_string(), "UInt64".to_string());
         metadata.insert("ts_init".to_string(), "UInt64".to_string());
@@ -357,8 +362,8 @@ impl Display for Bar {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{},{},{},{},{},{},{}",
-            self.bar_type, self.open, self.high, self.low, self.close, self.volume, self.ts_event
+            "{},{},{},{},{},{},{},{}",
+            self.bar_type, self.open, self.high, self.low, self.close, self.vwap, self.volume, self.ts_event
         )
     }
 }
@@ -734,6 +739,7 @@ mod tests {
             high: Price::from("1.00004"),
             low: Price::from("1.00002"),
             close: Price::from("1.00003"),
+            vwap: Price::from("1.00006"),
             volume: Quantity::from("100000"),
             ts_event: UnixNanos::default(),
             ts_init: UnixNanos::from(1),
@@ -745,6 +751,7 @@ mod tests {
             high: Price::from("1.00004"),
             low: Price::from("1.00002"),
             close: Price::from("1.00003"),
+            vwap: Price::from("1.00006"),
             volume: Quantity::from("100000"),
             ts_event: UnixNanos::default(),
             ts_init: UnixNanos::from(1),

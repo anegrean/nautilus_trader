@@ -602,6 +602,8 @@ cdef extern from "../includes/model.h":
         Price_t low;
         # The bars close price.
         Price_t close;
+        # The bars volume-weighted average price.
+        Price_t vwap;
         # The bars volume.
         Quantity_t volume;
         # UNIX timestamp (nanoseconds) when the data event occurred.
@@ -844,6 +846,7 @@ cdef extern from "../includes/model.h":
                   Price_t high,
                   Price_t low,
                   Price_t close,
+                  Price_t vwap,
                   Quantity_t volume,
                   uint64_t ts_event,
                   uint64_t ts_init);
@@ -853,6 +856,7 @@ cdef extern from "../includes/model.h":
                            int64_t high,
                            int64_t low,
                            int64_t close,
+                           int64_t vwap,
                            uint8_t price_prec,
                            uint64_t volume,
                            uint8_t size_prec,

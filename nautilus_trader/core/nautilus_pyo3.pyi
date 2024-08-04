@@ -478,6 +478,7 @@ class Bar:
         high: Price,
         low: Price,
         close: Price,
+        vwap: Price,
         volume: Quantity,
         ts_event: int,
         ts_init: int,
@@ -492,6 +493,8 @@ class Bar:
     def low(self) -> Price: ...
     @property
     def close(self) -> Price: ...
+    @property
+    def vwap(self) -> Price: ...
     @property
     def volume(self) -> Quantity: ...
     @property
