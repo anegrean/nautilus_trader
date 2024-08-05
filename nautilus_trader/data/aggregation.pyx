@@ -78,7 +78,6 @@ cdef class BarBuilder:
         self._close = None
         self._vwap = None
         self.volume = Quantity.zero_c(precision=self.size_precision)
-        
 
     def __repr__(self) -> str:
         return (
@@ -167,7 +166,7 @@ cdef class BarBuilder:
         if self._vwap is None:
             self._vwap = price
         else:
-            self._vwap._mem.raw = (self._vwap._mem.raw * self.volume._mem.raw + price._mem.raw * size._mem.raw)/(self.volume._mem.raw+size._mem.raw)
+            self._vwap = Price((self._vwap.as_f64_c() * self.volume.as_f64_c() + price.as_f64_c() * size.as_f64_c())/(self.volume.as_f64_c()+size.as_f64_c()), price.precision)
 
         self.volume._mem.raw += size._mem.raw
         
