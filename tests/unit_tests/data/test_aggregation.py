@@ -73,11 +73,11 @@ class TestBarBuilder:
         # Act, Assert
         assert (
             str(builder)
-            == "BarBuilder(BTCUSDT.BINANCE-100-TICK-LAST-EXTERNAL,None,None,None,None,0.000000)"
+            == "BarBuilder(BTCUSDT.BINANCE-100-TICK-LAST-EXTERNAL,None,None,None,None,None,0.000000)"
         )
         assert (
             repr(builder)
-            == "BarBuilder(BTCUSDT.BINANCE-100-TICK-LAST-EXTERNAL,None,None,None,None,0.000000)"
+            == "BarBuilder(BTCUSDT.BINANCE-100-TICK-LAST-EXTERNAL,None,None,None,None,None,0.000000)"
         )
 
     def test_set_partial_updates_bar_to_expected_properties(self):
@@ -91,6 +91,7 @@ class TestBarBuilder:
             high=Price.from_str("1.00010"),
             low=Price.from_str("1.00000"),
             close=Price.from_str("1.00002"),
+            vwap=Price.from_str("1.00006"),
             volume=Quantity.from_str("1"),
             ts_event=1_000_000_000,
             ts_init=1_000_000_000,
@@ -106,6 +107,7 @@ class TestBarBuilder:
         assert bar.high == Price.from_str("1.00010")
         assert bar.low == Price.from_str("1.00000")
         assert bar.close == Price.from_str("1.00002")
+        assert bar.vwap == Price.from_str("1.00006")
         assert bar.volume == Quantity.from_str("1")
         assert bar.ts_init == 1_000_000_000
         assert builder.ts_last == 1_000_000_000
@@ -121,6 +123,7 @@ class TestBarBuilder:
             high=Price.from_str("1.00010"),
             low=Price.from_str("1.00000"),
             close=Price.from_str("1.00002"),
+            vwap=Price.from_str("1.00006"),
             volume=Quantity.from_str("1"),
             ts_event=1_000_000_000,
             ts_init=1_000_000_000,
@@ -132,6 +135,7 @@ class TestBarBuilder:
             high=Price.from_str("2.00010"),
             low=Price.from_str("2.00000"),
             close=Price.from_str("2.00002"),
+            vwap=Price.from_str("2.00006"),
             volume=Quantity.from_str("2"),
             ts_event=1_000_000_000,
             ts_init=3_000_000_000,
@@ -148,6 +152,7 @@ class TestBarBuilder:
         assert bar.high == Price.from_str("1.00010")
         assert bar.low == Price.from_str("1.00000")
         assert bar.close == Price.from_str("1.00002")
+        assert bar.vwap == Price.from_str("1.00006")
         assert bar.volume == Quantity.from_str("1")
         assert bar.ts_init == 4_000_000_000
         assert builder.ts_last == 1_000_000_000
@@ -224,6 +229,7 @@ class TestBarBuilder:
         assert bar.high == Price.from_str("1.00002")
         assert bar.low == Price.from_str("1.00000")
         assert bar.close == Price.from_str("1.00000")
+        assert bar.vwap == Price.from_str("1.00001")
         assert bar.volume == Quantity.from_str("4.0")
         assert bar.ts_init == 1_000_000_000
         assert builder.ts_last == 1_000_000_000
@@ -248,6 +254,7 @@ class TestBarBuilder:
         assert bar2.high == Price.from_str("1.00003")
         assert bar2.low == Price.from_str("1.00000")
         assert bar2.close == Price.from_str("1.00002")
+        assert bar2.vwap == Price.from_str("1.000017")
         assert bar2.volume == Quantity.from_str("3.0")
 
 
@@ -361,6 +368,7 @@ class TestTickBarAggregator:
         assert handler[0].high == Price.from_str("1.000035")
         assert handler[0].low == Price.from_str("1.000015")
         assert handler[0].close == Price.from_str("1.000015")
+        assert handler[0].vwap == Price.from_str("1.000025")
         assert handler[0].volume == Quantity.from_int(3)
 
     def test_handle_trade_tick_when_count_at_threshold_sends_bar_to_handler(self):
@@ -416,6 +424,7 @@ class TestTickBarAggregator:
         assert handler[0].high == Price.from_str("1.00002")
         assert handler[0].low == Price.from_str("1.00000")
         assert handler[0].close == Price.from_str("1.00000")
+        assert handler[0].vwap == Price.from_str("1.00001")
         assert handler[0].volume == Quantity.from_int(3)
 
     def test_run_quote_ticks_through_aggregator_results_in_expected_bars(self):
@@ -446,6 +455,7 @@ class TestTickBarAggregator:
         assert last_bar.high == Price.from_str("0.670345")
         assert last_bar.low == Price.from_str("0.670225")
         assert last_bar.close == Price.from_str("0.670230")
+        # need here vwap check
         assert last_bar.volume == Quantity.from_int(100_000_000)
 
     def test_run_trade_ticks_through_aggregator_results_in_expected_bars(self):
@@ -475,6 +485,7 @@ class TestTickBarAggregator:
         assert last_bar.high == Price.from_str("425.25")
         assert last_bar.low == Price.from_str("424.51")
         assert last_bar.close == Price.from_str("425.15")
+        # need here vwap check
         assert last_bar.volume == Quantity.from_int(3142)
 
 
@@ -588,6 +599,7 @@ class TestVolumeBarAggregator:
         assert handler[0].high == Price.from_str("1.00002")
         assert handler[0].low == Price.from_str("1.00000")
         assert handler[0].close == Price.from_str("1.00000")
+        assert handler[0].vwap == Price.from_str("1.000011")
         assert handler[0].volume == Quantity.from_int(10_000)
 
     def test_handle_trade_tick_when_volume_at_threshold_sends_bar_to_handler(self):
@@ -643,6 +655,7 @@ class TestVolumeBarAggregator:
         assert handler[0].high == Price.from_str("1.00002")
         assert handler[0].low == Price.from_str("1.00000")
         assert handler[0].close == Price.from_str("1.00000")
+        assert handler[0].vwap == Price.from_str("1.000011")
         assert handler[0].volume == Quantity.from_int(10_000)
 
     def test_handle_quote_tick_when_volume_beyond_threshold_sends_bars_to_handler(self):
@@ -698,16 +711,19 @@ class TestVolumeBarAggregator:
         assert handler[0].high == Price.from_str("1.00002")
         assert handler[0].low == Price.from_str("1.00000")
         assert handler[0].close == Price.from_str("1.00000")
+        # need here vwap check
         assert handler[0].volume == Quantity.from_int(10_000)
         assert handler[1].open == Price.from_str("1.00000")
         assert handler[1].high == Price.from_str("1.00000")
         assert handler[1].low == Price.from_str("1.00000")
         assert handler[1].close == Price.from_str("1.00000")
+        # need here vwap check
         assert handler[1].volume == Quantity.from_int(10_000)
         assert handler[2].open == Price.from_str("1.00000")
         assert handler[2].high == Price.from_str("1.00000")
         assert handler[2].low == Price.from_str("1.00000")
         assert handler[2].close == Price.from_str("1.00000")
+        # need here vwap check
         assert handler[2].volume == Quantity.from_int(10_000)
 
     def test_handle_trade_tick_when_volume_beyond_threshold_sends_bars_to_handler(self):
@@ -763,16 +779,19 @@ class TestVolumeBarAggregator:
         assert handler[0].high == Price.from_str("1.00002")
         assert handler[0].low == Price.from_str("1.00000")
         assert handler[0].close == Price.from_str("1.00000")
+        # need here vwap check
         assert handler[0].volume == Quantity.from_int(10_000)
         assert handler[1].open == Price.from_str("1.00000")
         assert handler[1].high == Price.from_str("1.00000")
         assert handler[1].low == Price.from_str("1.00000")
         assert handler[1].close == Price.from_str("1.00000")
+        # need here vwap check
         assert handler[1].volume == Quantity.from_int(10_000)
         assert handler[2].open == Price.from_str("1.00000")
         assert handler[2].high == Price.from_str("1.00000")
         assert handler[2].low == Price.from_str("1.00000")
         assert handler[2].close == Price.from_str("1.00000")
+        # need here vwap check
         assert handler[2].volume == Quantity.from_int(10_000)
 
     def test_run_quote_ticks_through_aggregator_results_in_expected_bars(self):
@@ -806,6 +825,7 @@ class TestVolumeBarAggregator:
         assert last_bar.high == Price.from_str("0.670705")
         assert last_bar.low == Price.from_str("0.670370")
         assert last_bar.close == Price.from_str("0.670655")
+        # need here vwap check
         assert last_bar.volume == Quantity.from_int(1_000)
 
     def test_run_trade_ticks_through_aggregator_results_in_expected_bars(self):
@@ -835,6 +855,7 @@ class TestVolumeBarAggregator:
         assert last_bar.high == Price.from_str("425.20")
         assert last_bar.low == Price.from_str("424.69")
         assert last_bar.close == Price.from_str("425.06")
+        # need here vwap check
         assert last_bar.volume == Quantity.from_int(1_000)
 
 
@@ -950,6 +971,7 @@ class TestTestValueBarAggregator:
         assert handler[0].high == Price.from_str("1.00002")
         assert handler[0].low == Price.from_str("1.00000")
         assert handler[0].close == Price.from_str("1.00000")
+        # need here vwap check
         assert handler[0].volume == Quantity.from_str("99999")
         assert aggregator.get_cumulative_value() == Decimal("10501.400")
 
@@ -1006,11 +1028,13 @@ class TestTestValueBarAggregator:
         assert handler[0].high == Price.from_str("20.00002")
         assert handler[0].low == Price.from_str("20.00001")
         assert handler[0].close == Price.from_str("20.00002")
+        # need here vwap check
         assert handler[0].volume == Quantity.from_str("5000.00")
         assert handler[1].open == Price.from_str("20.00002")
         assert handler[1].high == Price.from_str("20.00002")
         assert handler[1].low == Price.from_str("20.00000")
         assert handler[1].close == Price.from_str("20.00000")
+        # need here vwap check
         assert handler[1].volume == Quantity.from_str("5000.00")
         assert aggregator.get_cumulative_value() == Decimal("40000.11000")
 
@@ -1045,6 +1069,7 @@ class TestTestValueBarAggregator:
         assert last_bar.high == Price.from_str("0.671330")
         assert last_bar.low == Price.from_str("0.670370")
         assert last_bar.close == Price.from_str("0.670630")
+        # need here vwap check
         assert last_bar.volume == Quantity.from_int(1_491)
 
     def test_run_trade_ticks_through_aggregator_results_in_expected_bars(self):
@@ -1073,6 +1098,7 @@ class TestTestValueBarAggregator:
         assert last_bar.high == Price.from_str("423.25")
         assert last_bar.low == Price.from_str("423.19")
         assert last_bar.close == Price.from_str("423.25")
+        # need here vwap check
         assert last_bar.volume == Quantity.from_int(24)
 
 
@@ -1203,6 +1229,7 @@ class TestTimeBarAggregator:
         assert Price.from_str("1.000035") == bar.high
         assert Price.from_str("1.000015") == bar.low
         assert Price.from_str("1.000015") == bar.close
+        assert Price.from_str("1.000025") == bar.vwap
         assert Quantity.from_int(3) == bar.volume
         assert bar.ts_init == 60_000_000_000
 
@@ -1254,6 +1281,7 @@ class TestTimeBarAggregator:
         assert handler[0].high == Price.from_str("39435.66")
         assert handler[0].low == Price.from_str("39430.29")
         assert handler[0].close == Price.from_str("39435.66")
+        # need here vwap check
         assert handler[0].volume == Quantity.from_str("6.169286")
         assert handler[0].ts_event == 1610064002000000000
         assert handler[0].ts_init == 1610064002000000000
