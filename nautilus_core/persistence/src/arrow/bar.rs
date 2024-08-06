@@ -131,15 +131,38 @@ impl DecodeFromRecordBatch for Bar {
     ) -> Result<Vec<Self>, EncodingError> {
         let (bar_type, price_precision, size_precision) = parse_metadata(metadata)?;
         let cols = record_batch.columns();
+        let nfields = record_batch.schema().fields.len();
 
-        let open_values = extract_column::<Int64Array>(cols, "open", 0, DataType::Int64)?;
-        let high_values = extract_column::<Int64Array>(cols, "high", 1, DataType::Int64)?;
-        let low_values = extract_column::<Int64Array>(cols, "low", 2, DataType::Int64)?;
-        let close_values = extract_column::<Int64Array>(cols, "close", 3, DataType::Int64)?;
-        let vwap_values = extract_column::<Int64Array>(cols, "vwap", 4, DataType::Int64)?;
-        let volume_values = extract_column::<UInt64Array>(cols, "volume", 5, DataType::UInt64)?;
-        let ts_event_values = extract_column::<UInt64Array>(cols, "ts_event", 6, DataType::UInt64)?;
-        let ts_init_values = extract_column::<UInt64Array>(cols, "ts_init", 7, DataType::UInt64)?;
+        let open_values ;
+        let high_values;
+        let low_values;
+        let close_values;
+        let vwap_values: Option<&Int64Array>;
+        let volume_values;
+        let ts_event_values;
+        let ts_init_values;
+
+        if nfields == 7 {
+            open_values = extract_column::<Int64Array>(cols, "open", 0, DataType::Int64)?;
+            high_values = extract_column::<Int64Array>(cols, "high", 1, DataType::Int64)?;
+            low_values = extract_column::<Int64Array>(cols, "low", 2, DataType::Int64)?;
+            close_values = extract_column::<Int64Array>(cols, "close", 3, DataType::Int64)?;
+            vwap_values = None;
+            volume_values = extract_column::<UInt64Array>(cols, "volume", 4, DataType::UInt64)?;
+            ts_event_values = extract_column::<UInt64Array>(cols, "ts_event", 5, DataType::UInt64)?;
+            ts_init_values = extract_column::<UInt64Array>(cols, "ts_init", 6, DataType::UInt64)?;
+        } else if nfields == 8 {
+            open_values = extract_column::<Int64Array>(cols, "open", 0, DataType::Int64)?;
+            high_values = extract_column::<Int64Array>(cols, "high", 1, DataType::Int64)?;
+            low_values = extract_column::<Int64Array>(cols, "low", 2, DataType::Int64)?;
+            close_values = extract_column::<Int64Array>(cols, "close", 3, DataType::Int64)?;
+            vwap_values = Some(extract_column::<Int64Array>(cols, "vwap", 4, DataType::Int64)?);
+            volume_values = extract_column::<UInt64Array>(cols, "volume", 5, DataType::UInt64)?;
+            ts_event_values = extract_column::<UInt64Array>(cols, "ts_event", 6, DataType::UInt64)?;
+            ts_init_values = extract_column::<UInt64Array>(cols, "ts_init", 7, DataType::UInt64)?;
+        } else {
+            return Err(EncodingError::ParseError("Bar parsing error.", "Bad column format".to_string()));
+        }
 
         let result: Result<Vec<Self>, EncodingError> = (0..record_batch.num_rows())
             .map(|i| {
@@ -147,7 +170,10 @@ impl DecodeFromRecordBatch for Bar {
                 let high = Price::from_raw(high_values.value(i), price_precision).unwrap();
                 let low = Price::from_raw(low_values.value(i), price_precision).unwrap();
                 let close = Price::from_raw(close_values.value(i), price_precision).unwrap();
-                let vwap = Price::from_raw(vwap_values.value(i), price_precision).unwrap();
+                let vwap = match vwap_values {
+                    Some(values) => Price::from_raw(values.value(i), price_precision).unwrap(),
+                    None => Price::from_raw(0, price_precision).unwrap(), // Default value if vwap is not present
+                };
                 let volume = Quantity::from_raw(volume_values.value(i), size_precision).unwrap();
                 let ts_event = ts_event_values.value(i).into();
                 let ts_init = ts_init_values.value(i).into();
