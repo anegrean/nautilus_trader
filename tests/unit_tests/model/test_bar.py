@@ -444,6 +444,7 @@ class TestBar:
                 Price.from_str("1.00000"),  # <-- High below open
                 Price.from_str("1.00000"),
                 Price.from_str("1.00000"),
+                Price.from_str("1.00000"),
                 Quantity.from_int(100_000),
                 0,
                 0,
@@ -458,6 +459,7 @@ class TestBar:
                 Price.from_str("1.00000"),  # <-- High below low
                 Price.from_str("1.00002"),
                 Price.from_str("1.00003"),
+                Price.from_str("1.00000"),
                 Quantity.from_int(100_000),
                 0,
                 0,
@@ -472,6 +474,7 @@ class TestBar:
                 Price.from_str("1.00000"),  # <-- High below close
                 Price.from_str("1.00000"),
                 Price.from_str("1.00001"),
+                Price.from_str("1.00000"),
                 Quantity.from_int(100_000),
                 0,
                 0,
@@ -486,6 +489,7 @@ class TestBar:
                 Price.from_str("1.00005"),
                 Price.from_str("1.00000"),
                 Price.from_str("0.99999"),  # <-- Close below low
+                Price.from_str("1.00000"),
                 Quantity.from_int(100_000),
                 0,
                 0,
@@ -497,6 +501,7 @@ class TestBar:
             Bar(
                 AUDUSD_1_MIN_BID,
                 Price.from_str("0.99999"),  # <-- Open below low
+                Price.from_str("1.00000"),
                 Price.from_str("1.00000"),
                 Price.from_str("1.00000"),
                 Price.from_str("1.00000"),
@@ -513,6 +518,7 @@ class TestBar:
             Price.from_str("1.00004"),
             Price.from_str("1.00001"),
             Price.from_str("1.00001"),
+            Price.from_str("1.00002"),
             Quantity.from_int(100_000),
             0,
             0,
@@ -524,6 +530,7 @@ class TestBar:
             Price.from_str("1.00004"),
             Price.from_str("1.00000"),
             Price.from_str("1.00003"),
+            Price.from_str("1.00001"),
             Quantity.from_int(100_000),
             0,
             0,
@@ -541,6 +548,7 @@ class TestBar:
             Price.from_str("1.00004"),
             Price.from_str("1.00000"),
             Price.from_str("1.00003"),
+            Price.from_str("1.00002"),
             Quantity.from_int(100_000),
             0,
             0,
@@ -549,17 +557,18 @@ class TestBar:
         # Act, Assert
         assert isinstance(hash(bar), int)
         assert (
-            str(bar) == "AUD/USD.SIM-1-MINUTE-BID-EXTERNAL,1.00001,1.00004,1.00000,1.00003,100000,0"
+            str(bar) == "AUD/USD.SIM-1-MINUTE-BID-EXTERNAL,1.00001,1.00004,1.00000,1.00003,1.00002,100000,0"
         )
         assert (
             repr(bar)
-            == "Bar(AUD/USD.SIM-1-MINUTE-BID-EXTERNAL,1.00001,1.00004,1.00000,1.00003,100000,0)"
+            == "Bar(AUD/USD.SIM-1-MINUTE-BID-EXTERNAL,1.00001,1.00004,1.00000,1.00003,1.00002,100000,0)"
         )
 
     def test_is_single_price(self):
         # Arrange
         bar1 = Bar(
             AUDUSD_1_MIN_BID,
+            Price.from_str("1.00000"),
             Price.from_str("1.00000"),
             Price.from_str("1.00000"),
             Price.from_str("1.00000"),
@@ -575,6 +584,7 @@ class TestBar:
             Price.from_str("1.00004"),
             Price.from_str("1.00000"),
             Price.from_str("1.00003"),
+            Price.from_str("1.00001"),
             Quantity.from_int(100_000),
             0,
             0,
@@ -592,6 +602,7 @@ class TestBar:
             Price.from_str("1.00004"),
             Price.from_str("1.00000"),
             Price.from_str("1.00003"),
+            Price.from_str("1.00002"),
             Quantity.from_int(100_000),
             0,
             0,
@@ -608,6 +619,7 @@ class TestBar:
             "high": "1.00004",
             "low": "1.00000",
             "close": "1.00003",
+            "vwap": "1.00002",
             "volume": "100000",
             "ts_event": 0,
             "ts_init": 0,
@@ -621,6 +633,7 @@ class TestBar:
             1063550000,
             1062050000,
             1063200000,
+            1063410000,
             5,
             0,
             0,
@@ -638,6 +651,7 @@ class TestBar:
             Price.from_str("1.06355"),
             Price.from_str("1.06205"),
             Price.from_str("1.06320"),
+            Price.from_str("1.06341"),
             Quantity.from_str("0"),
             1672012800000000000,
             1672013100300000000,
@@ -671,6 +685,7 @@ class TestBar:
             Price.from_str("1.00000"),
             Price.from_str("1.00000"),
             Price.from_str("1.00000"),
+            Price.from_str("1.00000"),
             Quantity.from_int(100_000),
             1,
             2,
@@ -685,6 +700,7 @@ class TestBar:
         assert pyo3_bar.high == nautilus_pyo3.Price.from_str("1.00000")
         assert pyo3_bar.low == nautilus_pyo3.Price.from_str("1.00000")
         assert pyo3_bar.close == nautilus_pyo3.Price.from_str("1.00000")
+        assert pyo3_bar.vwap == nautilus_pyo3.Price.from_str("1.00000")
         assert pyo3_bar.volume == nautilus_pyo3.Quantity.from_int(100_000)
         assert pyo3_bar.ts_event == 1
         assert pyo3_bar.ts_init == 2
@@ -708,6 +724,7 @@ class TestBar:
             Price.from_str("1.00004"),
             Price.from_str("1.00000"),
             Price.from_str("1.00003"),
+            Price.from_str("1.00002"),
             Quantity.from_int(100_000),
             0,
             0,

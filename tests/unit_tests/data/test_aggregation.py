@@ -398,7 +398,7 @@ class TestBarBuilder:
         assert bar2.high == Price.from_str("1.00003")
         assert bar2.low == Price.from_str("1.00000")
         assert bar2.close == Price.from_str("1.00002")
-        assert bar2.vwap == Price.from_str("1.000017")
+        assert bar2.vwap == Price.from_str("1.00001")
         assert bar2.volume == Quantity.from_str("3.0")
 
 
@@ -913,7 +913,7 @@ class TestVolumeBarAggregator:
         assert handler[0].high == Price.from_str("1.00002")
         assert handler[0].low == Price.from_str("1.00000")
         assert handler[0].close == Price.from_str("1.00000")
-        assert handler[0].vwap == Price.from_str("1.000011")
+        assert handler[0].vwap == Price.from_str("1.00001")
         assert handler[0].volume == Quantity.from_int(10_000)
 
     def test_handle_trade_tick_when_volume_at_threshold_sends_bar_to_handler(self):
@@ -969,7 +969,7 @@ class TestVolumeBarAggregator:
         assert handler[0].high == Price.from_str("1.00002")
         assert handler[0].low == Price.from_str("1.00000")
         assert handler[0].close == Price.from_str("1.00000")
-        assert handler[0].vwap == Price.from_str("1.000011")
+        assert handler[0].vwap == Price.from_str("1.00001")
         assert handler[0].volume == Quantity.from_int(10_000)
 
     def test_handle_bar_when_volume_at_threshold_sends_bar_to_handler(self):
