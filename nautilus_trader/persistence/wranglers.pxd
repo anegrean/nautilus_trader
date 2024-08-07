@@ -112,3 +112,4 @@ cdef class BarDataWrangler:
     cdef readonly Instrument instrument
 
     cpdef Bar _build_bar(self, double[:] values, uint64_t ts_event, uint64_t ts_init_delta)
+    cpdef Bar _build_bar_with_vwap(self, double[:] values, uint64_t ts_event, uint64_t ts_init_delta)

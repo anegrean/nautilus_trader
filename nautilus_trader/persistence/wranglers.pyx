@@ -813,7 +813,8 @@ cdef class BarDataWrangler:
         """
         Process the given bar dataset into Nautilus `Bar` objects.
 
-        Expects columns ['open', 'high', 'low', 'close', 'vwap', 'volume'] with 'timestamp' index.
+        Expects columns ['open', 'high', 'low', 'close', 'volume'] or
+        ['open', 'high', 'low', 'close', 'vwap', 'volume'] with 'timestamp' index.
         Note: The 'volume' column is optional, if one does not exist then will use the `default_volume`.
         The 'vwap' column is also optional, if one does not exist then will use 0 price.
 
@@ -844,23 +845,43 @@ cdef class BarDataWrangler:
 
         data = as_utc_index(data)
 
-        if "vwap" not in data:
-            data["vwap"] = 0.0
-
         if "volume" not in data:
             data["volume"] = float(default_volume)
         
         ts_events, ts_inits = prepare_event_and_init_timestamps(data.index, ts_init_delta)
 
-        return list(map(
-            self._build_bar,
-            data.values,
-            ts_events,
-            ts_inits
-        ))
+        if "vwap" in data:
+            return list(map(
+                self._build_bar_with_vwap,
+                data.values,
+                ts_events,
+                ts_inits
+            ))
+        else:
+            return list(map(
+                self._build_bar,
+                data.values,
+                ts_events,
+                ts_inits
+            ))
 
     # cpdef method for Python wrap() (called with map)
     cpdef Bar _build_bar(self, double[:] values, uint64_t ts_event, uint64_t ts_init):
+        # Build a bar from the given index and values. The function expects the
+        # values to be an ndarray with 5 elements [open, high, low, close, volume].
+        return Bar(
+            bar_type=self.bar_type,
+            open=Price(values[0], self.instrument.price_precision),
+            high=Price(values[1], self.instrument.price_precision),
+            low=Price(values[2], self.instrument.price_precision),
+            close=Price(values[3], self.instrument.price_precision),
+            vwap=Price(0, self.instrument.price_precision),
+            volume=Quantity(values[4], self.instrument.size_precision),
+            ts_event=ts_event,
+            ts_init=ts_init,
+        )
+
+    cpdef Bar _build_bar_with_vwap(self, double[:] values, uint64_t ts_event, uint64_t ts_init):
         # Build a bar from the given index and values. The function expects the
         # values to be an ndarray with 5 elements [open, high, low, close, volume].
         return Bar(
