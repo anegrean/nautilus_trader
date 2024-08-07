@@ -151,6 +151,7 @@ def test_get_schema_map_with_unsupported_type() -> None:
                 "high": "Int64",
                 "low": "Int64",
                 "close": "Int64",
+                "vwap": "Int64",
                 "volume": "UInt64",
                 "ts_event": "UInt64",
                 "ts_init": "UInt64",
