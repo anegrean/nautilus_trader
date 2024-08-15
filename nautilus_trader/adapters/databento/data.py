@@ -73,7 +73,7 @@ class DatabentoDataClient(LiveMarketDataClient):
         The cache for the client.
     clock : LiveClock
         The clock for the client.
-    instrument_provder : DatabentoInstrumentProvider
+    instrument_provider : DatabentoInstrumentProvider
         The instrument provider for the client.
     loader : DatabentoDataLoader, optional
         The loader for the client.

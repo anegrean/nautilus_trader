@@ -49,7 +49,7 @@ cdef class BarBuilder:
     cdef Price _high
     cdef Price _low
     cdef Price _close
-    cdef Price _vwap
+    cdef double _vwap_buffer
     cdef Quantity volume
     
 

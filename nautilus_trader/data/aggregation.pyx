@@ -76,11 +76,15 @@ cdef class BarBuilder:
         self._high = None
         self._low = None
         self._close = None
-        self._vwap = None
+        self._vwap_buffer = 0.0
         self.volume = Quantity.zero_c(precision=self.size_precision)
         
 
     def __repr__(self) -> str:
+        if self.volume.is_zero():
+            vwap = Price(0, 4)
+        else:
+            vwap = Price(self._vwap_buffer/self.volume.as_f64_c(), 4)
         return (
             f"{type(self).__name__}("
             f"{self._bar_type},"
@@ -88,9 +92,8 @@ cdef class BarBuilder:
             f"{self._high},"
             f"{self._low},"
             f"{self._close},"
-            f"{self._vwap},"
-            f"{self.volume})"
-            
+            f"{vwap},"
+            f"{self.volume})" 
         )
 
     cpdef void set_partial(self, Bar partial_bar):
@@ -119,8 +122,8 @@ cdef class BarBuilder:
         if self._close is None:
             self._close = partial_bar.close
 
-        if self._vwap is None:
-            self._vwap = partial_bar.vwap
+        if self._vwap_buffer == 0.0:
+            self._vwap_buffer = partial_bar.vwap.as_f64_c()*partial_bar.volume.as_f64_c()
 
         self.volume = partial_bar.volume
         
@@ -163,12 +166,7 @@ cdef class BarBuilder:
             self._low = price
 
         self._close = price
-        
-        if self._vwap is None:
-            self._vwap = price
-        else:
-            self._vwap = Price((self._vwap.as_f64_c() * self.volume.as_f64_c() + price.as_f64_c() * size.as_f64_c())/(self.volume.as_f64_c()+size.as_f64_c()), price.precision)
-
+        self._vwap_buffer += price.as_f64_c()*size.as_f64_c()
         self.volume._mem.raw += size._mem.raw
         
         self.count += 1
@@ -176,7 +174,7 @@ cdef class BarBuilder:
 
     cpdef void update_bar(self, Bar bar, Quantity volume, uint64_t ts_init):
         """
-        Update the bar builder.
+        Update the bar builder with another bar.
 
         Parameters
         ----------
@@ -217,7 +215,7 @@ cdef class BarBuilder:
         self._open = None
         self._high = None
         self._low = None
-        self._vwap = None
+        self._vwap_buffer = 0.0
 
         self.volume = Quantity.zero_c(precision=self.size_precision)
         
@@ -255,7 +253,12 @@ cdef class BarBuilder:
             self._high = self._last_close
             self._low = self._last_close
             self._close = self._last_close
-            self._vwap = self._last_close
+            self._vwap_buffer = 0.0
+
+        if self.volume.is_zero():
+            vwap = Price(0, 4)
+        else:
+            vwap = Price(self._vwap_buffer/self.volume.as_f64_c(), 4)
 
         cdef Bar bar = Bar(
             bar_type=self._bar_type,
@@ -263,7 +266,7 @@ cdef class BarBuilder:
             high=self._high,
             low=self._low,
             close=self._close,
-            vwap=self._vwap,
+            vwap=vwap,
             volume=Quantity(self.volume, self.size_precision),
             ts_event=ts_event,
             ts_init=ts_init,
