@@ -142,6 +142,7 @@ cdef class BarType:
 
     cpdef bint is_externally_aggregated(self)
     cpdef bint is_internally_aggregated(self)
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id)
 
 
 cdef class Bar(Data):
@@ -195,6 +196,8 @@ cdef class Bar(Data):
     cdef dict to_dict_c(Bar obj)
 
     cpdef bint is_single_price(self)
+
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id)
 
 
 cdef class BookOrder:
@@ -268,6 +271,8 @@ cdef class OrderBookDelta(Data):
     @staticmethod
     cdef object list_to_capsule_c(list items)
 
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id)
+
 
 cdef class OrderBookDeltas(Data):
     cdef OrderBookDeltas_API _mem
@@ -280,6 +285,8 @@ cdef class OrderBookDeltas(Data):
 
     cpdef to_capsule(self)
     cpdef to_pyo3(self)
+
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id)
 
 
 cdef class OrderBookDepth10(Data):
@@ -302,6 +309,8 @@ cdef class OrderBookDepth10(Data):
 
     @staticmethod
     cdef object list_to_capsule_c(list items)
+
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id)
 
 
 cdef class InstrumentStatus(Data):
@@ -328,6 +337,8 @@ cdef class InstrumentStatus(Data):
     @staticmethod
     cdef dict to_dict_c(InstrumentStatus obj)
 
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id)
+
 
 cdef class InstrumentClose(Data):
     cdef readonly InstrumentId instrument_id
@@ -346,6 +357,8 @@ cdef class InstrumentClose(Data):
 
     @staticmethod
     cdef dict to_dict_c(InstrumentClose obj)
+
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id)
 
 
 cdef class QuoteTick(Data):
@@ -402,6 +415,8 @@ cdef class QuoteTick(Data):
     cpdef Price extract_price(self, PriceType price_type)
     cpdef Quantity extract_size(self, PriceType price_type)
 
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id)
+
 
 cdef class TradeTick(Data):
     cdef TradeTick_t _mem
@@ -454,3 +469,5 @@ cdef class TradeTick(Data):
 
     @staticmethod
     cdef TradeTick from_mem_c(TradeTick_t mem)
+
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id)

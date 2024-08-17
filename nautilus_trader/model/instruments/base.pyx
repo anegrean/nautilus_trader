@@ -590,6 +590,18 @@ cdef class Instrument(Data):
         Condition.not_none(quantity, "quantity")
 
         return Quantity(quantity.as_f64_c() * (1.0 / last_px.as_f64_c()), self.size_precision)
+    
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
+        """
+        Assign a new instrument ID to the instrument.
+
+        Parameters
+        ----------
+        instrument_id : InstrumentId
+            The new instrument ID.
+
+        """
+        self.id = instrument_id
 
 
 cpdef list[Instrument] instruments_from_pyo3(list pyo3_instruments):

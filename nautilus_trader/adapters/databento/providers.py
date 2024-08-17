@@ -19,7 +19,7 @@ from typing import Any
 
 import pandas as pd
 import pytz
-
+from nautilus_trader.adapters.databento.common import map_instrumentId
 from nautilus_trader.adapters.databento.constants import ALL_SYMBOLS
 from nautilus_trader.adapters.databento.constants import PUBLISHERS_PATH
 from nautilus_trader.adapters.databento.enums import DatabentoSchema
@@ -85,7 +85,7 @@ class DatabentoInstrumentProvider(InstrumentProvider):
 
     async def load_ids_async(
         self,
-        instrument_ids: list[InstrumentId],
+        instrument_ids: list[InstrumentId], # instrument_ids format compatible with Interactive Brokers CME venue
         filters: dict | None = None,
     ) -> None:
         """
@@ -115,9 +115,14 @@ class DatabentoInstrumentProvider(InstrumentProvider):
         """
         PyCondition.not_empty(instrument_ids, "instrument_ids")
 
-        instrument_ids_to_decode: set[str] = {i.value for i in instrument_ids}
+        # initial instrument_ids format compatible with Interactive Brokers CME venue
+        # convert Interactive Brokers CME venue instrumentId -> Databento GLBX
+        db_instrument_ids = [map_instrumentId(i) for i in instrument_ids]
+        
+        # instrument_ids format compatible with Databento GLBX venue
+        instrument_ids_to_decode: set[str] = {i.value for i in db_instrument_ids}
 
-        dataset = self._check_all_datasets_equal(instrument_ids)
+        dataset = self._check_all_datasets_equal(db_instrument_ids)
         live_client = nautilus_pyo3.DatabentoLiveClient(
             key=self._live_api_key,
             dataset=dataset,
@@ -137,7 +142,7 @@ class DatabentoInstrumentProvider(InstrumentProvider):
 
         live_client.subscribe(
             schema=DatabentoSchema.DEFINITION.value,
-            symbols=sorted([i.symbol.value for i in instrument_ids]),
+            symbols=sorted([i.symbol.value for i in db_instrument_ids]),
             start=0,  # From start of current week (latest definitions)
         )
 
@@ -167,6 +172,8 @@ class DatabentoInstrumentProvider(InstrumentProvider):
         instruments = instruments_from_pyo3(pyo3_instruments)
 
         for instrument in instruments:
+            # convert back from Databento GLBX -> Interactive Brokers CME venue instrumentId
+            instrument.assign_new_instrument_id(map_instrumentId(instrument.id))
             self.add(instrument=instrument)
             self._log.debug(f"Added instrument {instrument.id}.")
 
@@ -201,7 +208,7 @@ class DatabentoInstrumentProvider(InstrumentProvider):
 
     async def get_range(
         self,
-        instrument_ids: list[InstrumentId],
+        instrument_ids: list[InstrumentId], # instrument_ids format compatible with Interactive Brokers CME venue
         start: pd.Timestamp | dt.date | str | int,
         end: pd.Timestamp | dt.date | str | int | None = None,
         filters: dict | None = None,
@@ -232,6 +239,9 @@ class DatabentoInstrumentProvider(InstrumentProvider):
         Calling this method will incur a cost to your Databento account in USD.
 
         """
+        # convert to Databento GLBX venue compatible instrumentId
+        instrument_ids = [map_instrumentId(i) for i in instrument_ids]
+
         dataset = self._check_all_datasets_equal(instrument_ids)
 
         pyo3_instruments = await self._http_client.get_range_instruments(
@@ -244,6 +254,9 @@ class DatabentoInstrumentProvider(InstrumentProvider):
         instruments = instruments_from_pyo3(pyo3_instruments)
 
         instruments = sorted(instruments, key=lambda x: x.ts_init)
+        # convert back to Interactive Brokers CME venue compatible instrumentId
+        for instrument in instruments:
+            instrument.assign_new_instrument_id(map_instrumentId(instrument.id))
         return instruments
 
     def _check_all_datasets_equal(self, instrument_ids: list[InstrumentId]) -> str:

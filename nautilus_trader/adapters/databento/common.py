@@ -13,11 +13,15 @@
 #  limitations under the License.
 # -------------------------------------------------------------------------------------------------
 
+from functools import lru_cache
+import datetime as dt
+
 from nautilus_trader.adapters.databento.enums import DatabentoSchema
 from nautilus_trader.core.correctness import PyCondition
 from nautilus_trader.model.data import BarType
 from nautilus_trader.model.enums import BarAggregation
 from nautilus_trader.model.enums import PriceType
+from nautilus_trader.model.identifiers import InstrumentId
 
 
 def databento_schema_from_nautilus_bar_type(bar_type: BarType) -> DatabentoSchema:
@@ -70,3 +74,27 @@ def databento_schema_from_nautilus_bar_type(bar_type: BarType) -> DatabentoSchem
                 f"Invalid bar type '{bar_type}'. "
                 "Use any of ['SECOND', 'MINTUE', 'HOUR', 'DAY'] time aggregations.",
             )
+        
+@lru_cache(20)
+def map_instrumentId(instrument_id: InstrumentId) -> InstrumentId:
+    """
+    Map between Databento GLBX and Interactive Brokers CME instrument IDs.
+    """
+    # transform venue
+    if instrument_id.venue.value == "GLBX":
+        new_venue = "CME"
+    elif instrument_id.venue.value == "CME":
+        new_venue = "GLBX"
+    else:
+        new_venue = instrument_id.venue.value
+    
+    # transform symbol
+    if instrument_id.symbol.value[-2].isdigit():
+        new_symbol = instrument_id.symbol.value[:-2] + instrument_id.symbol.value[-1]
+    elif instrument_id.symbol.value[-1].isdigit():
+        # assume first digit of current year
+        new_symbol = instrument_id.symbol.value[:-1] + str(dt.datetime.now().year)[0] + instrument_id.symbol.value[-1]
+    else:
+        new_symbol = instrument_id.symbol.value
+    
+    return InstrumentId.from_str(f"{new_symbol}.{new_venue}")

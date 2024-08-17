@@ -696,6 +696,18 @@ cdef class BarType:
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self})"
 
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
+        """
+        Assign a new instrument ID to the bar type.
+
+        Parameters
+        ----------
+        instrument_id : InstrumentId
+            The new instrument ID to assign.
+
+        """
+        self._mem.instrument_id = instrument_id
+
     @property
     def instrument_id(self) -> InstrumentId:
         """
@@ -1350,6 +1362,10 @@ cdef class Bar(Data):
 
         """
         return self._mem.open.raw == self._mem.high.raw == self._mem.low.raw == self._mem.close.raw
+
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
+        self._mem.bar_type._mem.instrument_id = instrument_id
+
 
 
 cdef class DataType:
@@ -2305,6 +2321,9 @@ cdef class OrderBookDelta(Data):
 
         return output
 
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
+        self._mem.instrument_id = instrument_id
+
 
 cdef class OrderBookDeltas(Data):
     """
@@ -2586,6 +2605,8 @@ cdef class OrderBookDeltas(Data):
         deltas = nautilus_pyo3.OrderBookDeltas.from_pycapsule(capsule)
         return deltas
 
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
+        self.instrument_id = instrument_id
 
 
 cdef class OrderBookDepth10(Data):
@@ -3059,6 +3080,9 @@ cdef class OrderBookDepth10(Data):
 
         return output
 
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
+        self._mem.instrument_id = instrument_id
+
 
 cdef class InstrumentStatus(Data):
     """
@@ -3127,6 +3151,18 @@ cdef class InstrumentStatus(Data):
             f"is_short_sell_restricted={self.is_short_sell_restricted}, "
             f"ts_event={self.ts_event})"
         )
+
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
+        """
+        Assign a new instrument ID to the status.
+
+        Parameters
+        ----------
+        instrument_id : InstrumentId
+            The new instrument ID.
+
+        """
+        self.instrument_id = instrument_id
 
     @property
     def is_trading(self) -> bool | None:
@@ -3394,6 +3430,9 @@ cdef class InstrumentClose(Data):
         """
         return InstrumentClose.to_dict_c(obj)
 
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
+        self.instrument_id = instrument_id
+
 
 cdef class QuoteTick(Data):
     """
@@ -3499,6 +3538,18 @@ cdef class QuoteTick(Data):
 
     cdef str to_str(self):
         return cstr_to_pystr(quote_tick_to_cstr(&self._mem))
+    
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
+        """
+        Assign a new instrument ID to the quote tick.
+
+        Parameters
+        ----------
+        instrument_id : InstrumentId
+            The new instrument ID.
+
+        """
+        self._mem.instrument_id = instrument_id
 
     @property
     def instrument_id(self) -> InstrumentId:
@@ -4104,6 +4155,18 @@ cdef class TradeTick(Data):
 
     cdef str to_str(self):
         return cstr_to_pystr(trade_tick_to_cstr(&self._mem))
+
+    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
+        """
+        Assign a new instrument ID to the quote tick.
+
+        Parameters
+        ----------
+        instrument_id : InstrumentId
+            The new instrument ID.
+
+        """
+        self._mem.instrument_id = instrument_id
 
     @property
     def instrument_id(self) -> InstrumentId:

@@ -20,6 +20,7 @@ from typing import Any
 
 import pandas as pd
 
+from nautilus_trader.adapters.databento.common import map_instrumentId
 from nautilus_trader.adapters.databento.common import databento_schema_from_nautilus_bar_type
 from nautilus_trader.adapters.databento.config import DatabentoDataClientConfig
 from nautilus_trader.adapters.databento.constants import ALL_SYMBOLS
@@ -45,6 +46,7 @@ from nautilus_trader.model.data import DataType
 from nautilus_trader.model.data import InstrumentStatus
 from nautilus_trader.model.data import QuoteTick
 from nautilus_trader.model.data import TradeTick
+from nautilus_trader.model.data import CustomData
 from nautilus_trader.model.data import capsule_to_data
 from nautilus_trader.model.enums import BookType
 from nautilus_trader.model.enums import bar_aggregation_to_str
@@ -107,7 +109,7 @@ class DatabentoDataClient(LiveMarketDataClient):
             msgbus=msgbus,
             cache=cache,
             clock=clock,
-            instrument_provider=instrument_provider,
+            instrument_provider=instrument_provider, # instrument names provided are mapped to Interactive Brokers compatible names by the provider
             config=config,
         )
 
@@ -115,7 +117,7 @@ class DatabentoDataClient(LiveMarketDataClient):
         self._live_api_key: str = config.api_key or http_client.key
         self._live_gateway: str | None = config.live_gateway
         self._parent_symbols: dict[Dataset, set[str]] = defaultdict(set)
-        self._instrument_ids: dict[Dataset, set[InstrumentId]] = defaultdict(set)
+        self._instrument_ids: dict[Dataset, set[InstrumentId]] = defaultdict(set) # Databento compatible instrumentId
         self._timeout_initial_load: float | None = config.timeout_initial_load
         self._mbo_subscriptions_delay: float | None = config.mbo_subscriptions_delay
 
@@ -127,7 +129,7 @@ class DatabentoDataClient(LiveMarketDataClient):
         self._loader = loader or DatabentoDataLoader()
         self._dataset_ranges: dict[Dataset, tuple[pd.Timestamp, pd.Timestamp]] = {}
         self._dataset_ranges_requested: set[Dataset] = set()
-        self._trade_tick_subscriptions: set[InstrumentId] = set()
+        self._trade_tick_subscriptions: set[InstrumentId] = set() # Databento compatible instrumentId
 
         # Cache parent symbol index
         for dataset, parent_symbols in (config.parent_symbols or {}).items():
@@ -135,13 +137,14 @@ class DatabentoDataClient(LiveMarketDataClient):
 
         # Cache instrument index
         for instrument_id in config.instrument_ids or []:
-            dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
-            self._instrument_ids[dataset].add(instrument_id)
+            db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
+            dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
+            self._instrument_ids[dataset].add(db_instrument_id)
 
         # MBO/L3 subscription buffering
         self._buffer_mbo_subscriptions_task: asyncio.Task | None = None
         self._is_buffering_mbo_subscriptions: bool = bool(config.mbo_subscriptions_delay)
-        self._buffered_mbo_subscriptions: dict[Dataset, list[InstrumentId]] = defaultdict(list)
+        self._buffered_mbo_subscriptions: dict[Dataset, list[InstrumentId]] = defaultdict(list) # Databento compatible instrumentId
 
         # Tasks
         self._live_client_futures: set[asyncio.Future] = set()
@@ -149,7 +152,7 @@ class DatabentoDataClient(LiveMarketDataClient):
         self._update_dataset_ranges_task: asyncio.Task | None = None
 
     async def _connect(self) -> None:
-        if not self._instrument_ids:
+        if not self._instrument_ids: # Databento compatible instrumentId
             return  # Nothing else to do yet
 
         if self._is_buffering_mbo_subscriptions:
@@ -159,14 +162,15 @@ class DatabentoDataClient(LiveMarketDataClient):
 
         coros: list[Coroutine] = []
         for dataset, instrument_ids in self._instrument_ids.items():
-            loading_ids: list[InstrumentId] = sorted(instrument_ids)
+            loading_ids: list[InstrumentId] = sorted(instrument_ids) # Databento compatible instrumentId
             filters = {"parent_symbols": list(self._parent_symbols.get(dataset, []))}
+            ib_loading_ids = [map_instrumentId(i) for i in loading_ids] # Interactive Brokers compatible instrumentId
             coro = self._instrument_provider.load_ids_async(
-                instrument_ids=loading_ids,
+                instrument_ids=ib_loading_ids,
                 filters=filters,
             )
             coros.append(coro)
-            await self._subscribe_instrument_ids(dataset, instrument_ids=loading_ids)
+            await self._subscribe_instrument_ids(dataset, instrument_ids=loading_ids) # requires Databento compatible instrumentId
 
         try:
             if self._timeout_initial_load:
@@ -237,7 +241,7 @@ class DatabentoDataClient(LiveMarketDataClient):
             self._is_buffering_mbo_subscriptions = False
 
             coros: list[Coroutine] = []
-            for dataset, instrument_ids in self._buffered_mbo_subscriptions.items():
+            for dataset, instrument_ids in self._buffered_mbo_subscriptions.items(): # Databento compatible instrumentId
                 self._log.info(f"Starting {dataset} MBO/L3 live feeds")
                 coro = self._subscribe_order_book_deltas_batch(instrument_ids)
                 coros.append(coro)
@@ -292,19 +296,20 @@ class DatabentoDataClient(LiveMarketDataClient):
             self._log.info(f"Started {dataset} live feed", LogColor.BLUE)
 
     def _send_all_instruments_to_data_engine(self) -> None:
-        for instrument in self._instrument_provider.get_all().values():
+        for instrument in self._instrument_provider.get_all().values(): # Interactive Brokers compatible instrumentId
             self._handle_data(instrument)
 
-    async def _ensure_subscribed_for_instrument(self, instrument_id: InstrumentId) -> None:
+    async def _ensure_subscribed_for_instrument(self, instrument_id: InstrumentId) -> None: # Interactive Brokers compatible instrumentId
         try:
-            dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+            db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
+            dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
             subscribed_instruments = self._instrument_ids[dataset]
 
-            if instrument_id in subscribed_instruments:
+            if db_instrument_id in subscribed_instruments:
                 return
 
-            self._instrument_ids[dataset].add(instrument_id)
-            await self._subscribe_instrument(instrument_id)
+            self._instrument_ids[dataset].add(db_instrument_id) # Databento compatible instrumentId
+            await self._subscribe_instrument(instrument_id) # Interactive Brokers compatible instrumentId
         except asyncio.CancelledError:
             self._log.warning(
                 "`_ensure_subscribed_for_instrument` was canceled while still pending",
@@ -354,7 +359,7 @@ class DatabentoDataClient(LiveMarketDataClient):
 
     def subscribe_order_book_deltas(
         self,
-        instrument_id: InstrumentId,
+        instrument_id: InstrumentId, # requires Interactive Brokers compatible instrumentId
         book_type: BookType,
         depth: int | None = None,
         kwargs: dict[str, Any] | None = None,
@@ -388,12 +393,13 @@ class DatabentoDataClient(LiveMarketDataClient):
     async def _subscribe_imbalance(self, data_type: DataType) -> None:
         try:
             # TODO: Create `DatabentoTimeSeriesParams`
-            instrument_id: InstrumentId = data_type.metadata["instrument_id"]
-            dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+            instrument_id: InstrumentId = data_type.metadata["instrument_id"] # Interactive Brokers compatible instrumentId
+            db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
+            dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
             live_client = self._get_live_client(dataset)
             live_client.subscribe(
                 schema=DatabentoSchema.IMBALANCE.value,
-                symbols=[instrument_id.symbol.value],
+                symbols=[db_instrument_id.symbol.value],
             )
             await self._check_live_client_started(dataset, live_client)
         except asyncio.CancelledError:
@@ -402,12 +408,13 @@ class DatabentoDataClient(LiveMarketDataClient):
     async def _subscribe_statistics(self, data_type: DataType) -> None:
         try:
             # TODO: Create `DatabentoTimeSeriesParams`
-            instrument_id: InstrumentId = data_type.metadata["instrument_id"]
-            dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+            instrument_id: InstrumentId = data_type.metadata["instrument_id"] # Interactive Brokers compatible instrumentId
+            db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
+            dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
             live_client = self._get_live_client(dataset)
             live_client.subscribe(
                 schema=DatabentoSchema.STATISTICS.value,
-                symbols=[instrument_id.symbol.value],
+                symbols=[db_instrument_id.symbol.value],
             )
             await self._check_live_client_started(dataset, live_client)
         except asyncio.CancelledError:
@@ -417,13 +424,14 @@ class DatabentoDataClient(LiveMarketDataClient):
         # Replace method in child class, for exchange specific data types.
         raise NotImplementedError("Cannot subscribe to all instruments (not currently supported).")
 
-    async def _subscribe_instrument(self, instrument_id: InstrumentId) -> None:
+    async def _subscribe_instrument(self, instrument_id: InstrumentId) -> None: # Interactive Brokers compatible instrumentId
+        db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
         try:
-            dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+            dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
             live_client = self._get_live_client(dataset)
             live_client.subscribe(
                 schema=DatabentoSchema.DEFINITION.value,
-                symbols=[instrument_id.symbol.value],
+                symbols=[db_instrument_id.symbol.value],
             )
             await self._check_live_client_started(dataset, live_client)
         except asyncio.CancelledError:
@@ -448,7 +456,7 @@ class DatabentoDataClient(LiveMarketDataClient):
     async def _subscribe_instrument_ids(
         self,
         dataset: Dataset,
-        instrument_ids: list[InstrumentId],
+        instrument_ids: list[InstrumentId], # requires Databento compatible instrumentId
     ) -> None:
         try:
             live_client = self._get_live_client(dataset)
@@ -462,7 +470,7 @@ class DatabentoDataClient(LiveMarketDataClient):
 
     async def _subscribe_order_book_deltas(
         self,
-        instrument_id: InstrumentId,
+        instrument_id: InstrumentId, # requires Interactive Brokers compatible instrumentId
         book_type: BookType,
         depth: int | None = None,
         kwargs: dict | None = None,
@@ -478,14 +486,15 @@ class DatabentoDataClient(LiveMarketDataClient):
                 )
                 return
 
-            dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+            db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
+            dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
 
             if self._is_buffering_mbo_subscriptions:
                 self._log.debug(
                     f"Buffering MBO/L3 subscription for {instrument_id}",
                     LogColor.MAGENTA,
                 )
-                self._buffered_mbo_subscriptions[dataset].append(instrument_id)
+                self._buffered_mbo_subscriptions[dataset].append(instrument_id) # Databento compatible instrumentId
                 return
 
             if self._live_clients_mbo.get(dataset) is not None:
@@ -501,7 +510,7 @@ class DatabentoDataClient(LiveMarketDataClient):
 
     async def _subscribe_order_book_deltas_batch(
         self,
-        instrument_ids: list[InstrumentId],
+        instrument_ids: list[InstrumentId], # Interactive Brokers compatible instrumentId
     ) -> None:
         try:
             if not instrument_ids:
@@ -517,13 +526,14 @@ class DatabentoDataClient(LiveMarketDataClient):
                         "instrument must be pre-loaded via the `DatabentoDataClientConfig` "
                         "or a specific subscription on start",
                     )
-                    instrument_ids.remove(instrument_id)
+                    instrument_ids.remove(instrument_id) # Interactive Brokers compatible instrumentId
                     continue
 
             if not instrument_ids:
                 return  # No subscribing instrument IDs were loaded in the cache
 
-            dataset: Dataset = self._loader.get_dataset_for_venue(instrument_ids[0].venue)
+            db_instrument_id = map_instrumentId(instrument_ids[0]) # Databento compatible instrumentId
+            dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
             live_client = self._get_live_client_mbo(dataset)
 
             if dataset == "GLBX.MDP3":
@@ -535,19 +545,19 @@ class DatabentoDataClient(LiveMarketDataClient):
                 snapshot = False
                 detail_str = " with start=0 replay"
 
-            ids_str = ",".join([i.value for i in instrument_ids])
-            self._log.info(f"Subscribing to MBO/L3 for {ids_str}{detail_str}", LogColor.BLUE)
+            ids_str = ",".join([map_instrumentId(i).value for i in instrument_ids])
+            self._log.info(f"Subscribing to MBO/L3 for {ids_str}{detail_str}", LogColor.BLUE) # print instrument ids in Interactive Brokers compatible format
 
             live_client.subscribe(
                 schema=DatabentoSchema.MBO.value,
-                symbols=[i.symbol.value for i in instrument_ids],
+                symbols=[map_instrumentId(i).symbol.value for i in instrument_ids], # convert from Interactive Brokers compatible instrumentId to Databento compatible instrumentId
                 start=start,
                 snapshot=snapshot,
             )
 
             # Add trade tick subscriptions for all instruments (MBO data includes trades)
             for instrument_id in instrument_ids:
-                self._trade_tick_subscriptions.add(instrument_id)
+                self._trade_tick_subscriptions.add(map_instrumentId(instrument_id)) # requires Databento compatible instrumentId
 
             future = asyncio.ensure_future(
                 live_client.start(
@@ -563,7 +573,7 @@ class DatabentoDataClient(LiveMarketDataClient):
 
     async def _subscribe_order_book_snapshots(
         self,
-        instrument_id: InstrumentId,
+        instrument_id: InstrumentId, # Interactive Brokers compatible instrumentId
         book_type: BookType,
         depth: int | None = None,
         kwargs: dict | None = None,
@@ -582,54 +592,58 @@ class DatabentoDataClient(LiveMarketDataClient):
                     )
                     return
 
-            dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+            db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
+            dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
             live_client = self._get_live_client(dataset)
             live_client.subscribe(
                 schema=schema,
-                symbols=[instrument_id.symbol.value],
+                symbols=[db_instrument_id.symbol.value],
             )
             await self._check_live_client_started(dataset, live_client)
         except asyncio.CancelledError:
             self._log.warning("`_subscribe_order_book_snapshots` was canceled while still pending")
 
-    async def _subscribe_quote_ticks(self, instrument_id: InstrumentId) -> None:
+    async def _subscribe_quote_ticks(self, instrument_id: InstrumentId) -> None: # Interactive Brokers compatible instrumentId
         try:
             await self._ensure_subscribed_for_instrument(instrument_id)
 
-            dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+            db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
+            dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
             live_client = self._get_live_client(dataset)
             live_client.subscribe(
                 schema=DatabentoSchema.MBP_1.value,
-                symbols=[instrument_id.symbol.value],
+                symbols=[db_instrument_id.symbol.value],
             )
 
             # Add trade tick subscriptions for instrument (MBP-1 data includes trades)
-            self._trade_tick_subscriptions.add(instrument_id)
+            self._trade_tick_subscriptions.add(db_instrument_id) # requires Databento compatible instrumentId
 
             await self._check_live_client_started(dataset, live_client)
         except asyncio.CancelledError:
             self._log.warning("`_subscribe_quote_ticks` was canceled while still pending")
 
-    async def _subscribe_trade_ticks(self, instrument_id: InstrumentId) -> None:
+    async def _subscribe_trade_ticks(self, instrument_id: InstrumentId) -> None: # Interactive Brokers compatible instrumentId
         try:
-            if instrument_id in self._trade_tick_subscriptions:
+            db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
+            if db_instrument_id in self._trade_tick_subscriptions:
                 return  # Already subscribed (this will save on data costs)
 
-            await self._ensure_subscribed_for_instrument(instrument_id)
+            await self._ensure_subscribed_for_instrument(instrument_id) # Interactive Brokers compatible instrumentId
 
-            dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+            dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
             live_client = self._get_live_client(dataset)
             live_client.subscribe(
                 schema=DatabentoSchema.TRADES.value,
-                symbols=[instrument_id.symbol.value],
+                symbols=[db_instrument_id.symbol.value],
             )
             await self._check_live_client_started(dataset, live_client)
         except asyncio.CancelledError:
             self._log.warning("`_subscribe_trade_ticks` was canceled while still pending")
 
-    async def _subscribe_bars(self, bar_type: BarType) -> None:
+    async def _subscribe_bars(self, bar_type: BarType) -> None: # bars with Interactive Brokers compatible instrumentId
         try:
-            dataset: Dataset = self._loader.get_dataset_for_venue(bar_type.instrument_id.venue)
+            db_instrument_id = map_instrumentId(bar_type.instrument_id) # Databento compatible instrumentId
+            dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
 
             try:
                 schema = databento_schema_from_nautilus_bar_type(bar_type)
@@ -640,20 +654,21 @@ class DatabentoDataClient(LiveMarketDataClient):
             live_client = self._get_live_client(dataset)
             live_client.subscribe(
                 schema=schema.value,
-                symbols=[bar_type.instrument_id.symbol.value],
+                symbols=[db_instrument_id.symbol.value],
             )
             await self._check_live_client_started(dataset, live_client)
         except asyncio.CancelledError:
             self._log.warning("`_subscribe_bars` was canceled while still pending")
 
-    async def _subscribe_instrument_status(self, instrument_id: InstrumentId) -> None:
+    async def _subscribe_instrument_status(self, instrument_id: InstrumentId) -> None: # Interactive Brokers compatible instrumentId
         try:
-            dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+            db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
+            dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
 
             live_client = self._get_live_client(dataset)
             live_client.subscribe(
                 schema=DatabentoSchema.STATUS.value,
-                symbols=[instrument_id.symbol.value],
+                symbols=[db_instrument_id.symbol.value],
             )
             await self._check_live_client_started(dataset, live_client)
         except asyncio.CancelledError:
@@ -669,49 +684,49 @@ class DatabentoDataClient(LiveMarketDataClient):
             "Cannot unsubscribe from all instruments, unsubscribing not supported by Databento.",
         )
 
-    async def _unsubscribe_instrument(self, instrument_id: InstrumentId) -> None:
+    async def _unsubscribe_instrument(self, instrument_id: InstrumentId) -> None: # Interactive Brokers compatible instrumentId
         raise NotImplementedError(
             f"Cannot unsubscribe from {instrument_id} instrument, "
             "unsubscribing not supported by Databento.",
         )
 
-    async def _unsubscribe_order_book_deltas(self, instrument_id: InstrumentId) -> None:
+    async def _unsubscribe_order_book_deltas(self, instrument_id: InstrumentId) -> None: # Interactive Brokers compatible instrumentId
         raise NotImplementedError(
             f"Cannot unsubscribe from {instrument_id} order book deltas, "
             "unsubscribing not supported by Databento.",
         )
 
-    async def _unsubscribe_order_book_snapshots(self, instrument_id: InstrumentId) -> None:
+    async def _unsubscribe_order_book_snapshots(self, instrument_id: InstrumentId) -> None: # Interactive Brokers compatible instrumentId
         raise NotImplementedError(
             f"Cannot unsubscribe from {instrument_id} order book snapshots, "
             "unsubscribing not supported by Databento.",
         )
 
-    async def _unsubscribe_quote_ticks(self, instrument_id: InstrumentId) -> None:
+    async def _unsubscribe_quote_ticks(self, instrument_id: InstrumentId) -> None: # Interactive Brokers compatible instrumentId
         raise NotImplementedError(
             f"Cannot unsubscribe from {instrument_id} quote ticks, "
             "unsubscribing not supported by Databento.",
         )
 
-    async def _unsubscribe_trade_ticks(self, instrument_id: InstrumentId) -> None:
+    async def _unsubscribe_trade_ticks(self, instrument_id: InstrumentId) -> None: # Interactive Brokers compatible instrumentId
         raise NotImplementedError(
             f"Cannot unsubscribe from {instrument_id} trade ticks, "
             "unsubscribing not supported by Databento.",
         )
 
-    async def _unsubscribe_bars(self, bar_type: BarType) -> None:
+    async def _unsubscribe_bars(self, bar_type: BarType) -> None: # bars with Interactive Brokers compatible instrumentId
         raise NotImplementedError(
             f"Cannot unsubscribe from {bar_type} bars, "
             "unsubscribing not supported by Databento.",
         )
 
-    async def _unsubscribe_instrument_status(self, instrument_id: InstrumentId) -> None:
+    async def _unsubscribe_instrument_status(self, instrument_id: InstrumentId) -> None: # Interactive Brokers compatible instrumentId
         raise NotImplementedError(
             f"Cannot unsubscribe from {instrument_id} instrument status, "
             "unsubscribing not supported by Databento.",
         )
 
-    async def _request(self, data_type: DataType, correlation_id: UUID4) -> None:
+    async def _request(self, data_type: DataType, correlation_id: UUID4) -> None: # data_type with Interactive Brokers compatible instrumentId
         if data_type.type == InstrumentStatus:
             await self._request_instrument_status(data_type, correlation_id)
         elif data_type.type == DatabentoImbalance:
@@ -724,12 +739,13 @@ class DatabentoDataClient(LiveMarketDataClient):
                 f"Cannot request {data_type.type} (not implemented).",
             )
 
-    async def _request_instrument_status(self, data_type: DataType, correlation_id: UUID4) -> None:
+    async def _request_instrument_status(self, data_type: DataType, correlation_id: UUID4) -> None: # data_type with Interactive Brokers compatible instrumentId
         instrument_id: InstrumentId = data_type.metadata["instrument_id"]
+        db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
         start = data_type.metadata.get("start")
         end = data_type.metadata.get("end")
 
-        dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+        dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
         _, available_end = await self._get_dataset_range(dataset)
 
         start = start or available_end - pd.Timedelta(days=2)
@@ -743,7 +759,7 @@ class DatabentoDataClient(LiveMarketDataClient):
 
         pyo3_status_list = await self._http_client.get_range_status(
             dataset=dataset,
-            symbols=[instrument_id.symbol.value],
+            symbols=[db_instrument_id.symbol.value],
             start=start.value,
             end=end.value,
         )
@@ -756,12 +772,13 @@ class DatabentoDataClient(LiveMarketDataClient):
             correlation_id=correlation_id,
         )
 
-    async def _request_imbalance(self, data_type: DataType, correlation_id: UUID4) -> None:
+    async def _request_imbalance(self, data_type: DataType, correlation_id: UUID4) -> None: # data_type with Interactive Brokers compatible instrumentId
         instrument_id: InstrumentId = data_type.metadata["instrument_id"]
+        db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
         start = data_type.metadata.get("start")
         end = data_type.metadata.get("end")
 
-        dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+        dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
         _, available_end = await self._get_dataset_range(dataset)
 
         start = start or available_end - pd.Timedelta(days=2)
@@ -775,7 +792,7 @@ class DatabentoDataClient(LiveMarketDataClient):
 
         pyo3_imbalances = await self._http_client.get_range_imbalance(
             dataset=dataset,
-            symbols=[instrument_id.symbol.value],
+            symbols=[db_instrument_id.symbol.value],
             start=start.value,
             end=end.value,
         )
@@ -786,12 +803,13 @@ class DatabentoDataClient(LiveMarketDataClient):
             correlation_id=correlation_id,
         )
 
-    async def _request_statistics(self, data_type: DataType, correlation_id: UUID4) -> None:
+    async def _request_statistics(self, data_type: DataType, correlation_id: UUID4) -> None: # data_type with Interactive Brokers compatible instrumentId
         instrument_id: InstrumentId = data_type.metadata["instrument_id"]
+        db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
         start = data_type.metadata.get("start")
         end = data_type.metadata.get("end")
 
-        dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+        dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
         _, available_end = await self._get_dataset_range(dataset)
 
         start = start or available_end - pd.Timedelta(days=2)
@@ -805,7 +823,7 @@ class DatabentoDataClient(LiveMarketDataClient):
 
         pyo3_statistics = await self._http_client.get_range_statistics(
             dataset=dataset,
-            symbols=[instrument_id.symbol.value],
+            symbols=[db_instrument_id.symbol.value],
             start=start.value,
             end=end.value,
         )
@@ -818,12 +836,13 @@ class DatabentoDataClient(LiveMarketDataClient):
 
     async def _request_instrument(
         self,
-        instrument_id: InstrumentId,
+        instrument_id: InstrumentId, # Interactive Brokers compatible instrumentId
         correlation_id: UUID4,
         start: pd.Timestamp | None = None,
         end: pd.Timestamp | None = None,
     ) -> None:
-        dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+        db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
+        dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
         _, available_end = await self._get_dataset_range(dataset)
 
         start = start or available_end - pd.Timedelta(days=2)
@@ -837,26 +856,31 @@ class DatabentoDataClient(LiveMarketDataClient):
 
         pyo3_instruments = await self._http_client.get_range_instruments(
             dataset=dataset,
-            symbols=[instrument_id.symbol.value],
+            symbols=[db_instrument_id.symbol.value],
             start=start.value,
             end=end.value,
         )
 
-        instruments = instruments_from_pyo3(pyo3_instruments)
+        db_instruments = instruments_from_pyo3(pyo3_instruments)
+        ib_instruments = [i.assign_new_instrument_id(map_instrumentId(i.id)) for i in db_instruments] # Interactive Brokers compatible instrumentId
 
         self._handle_instruments(
-            instruments=instruments,
+            instruments=ib_instruments,
             correlation_id=correlation_id,
         )
 
     async def _request_instruments(
         self,
-        venue: Venue,
+        venue: Venue, # Interactive Brokers compatible venue
         correlation_id: UUID4,
         start: pd.Timestamp | None = None,
         end: pd.Timestamp | None = None,
     ) -> None:
-        dataset: Dataset = self._loader.get_dataset_for_venue(venue)
+        if venue.value == "CME":
+            db_venue = Venue("GLBX")
+        else:
+            db_venue = venue
+        dataset: Dataset = self._loader.get_dataset_for_venue(db_venue)
         _, available_end = await self._get_dataset_range(dataset)
 
         start = start or available_end - pd.Timedelta(days=2)
@@ -875,23 +899,25 @@ class DatabentoDataClient(LiveMarketDataClient):
             end=end.value,
         )
 
-        instruments = instruments_from_pyo3(pyo3_instruments)
+        db_instruments = instruments_from_pyo3(pyo3_instruments) # Databento compatible instrumentId
+        ib_instruments = [i.assign_new_instrument_id(map_instrumentId(i.id)) for i in db_instruments] # Interactive Brokers compatible instrumentId
 
         self._handle_instruments(
-            instruments=instruments,
+            instruments=ib_instruments,
             venue=venue,
             correlation_id=correlation_id,
         )
 
     async def _request_quote_ticks(
         self,
-        instrument_id: InstrumentId,
+        instrument_id: InstrumentId, # Interactive Brokers compatible instrumentId
         limit: int,
         correlation_id: UUID4,
         start: pd.Timestamp | None = None,
         end: pd.Timestamp | None = None,
     ) -> None:
-        dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+        db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
+        dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
         _, available_end = await self._get_dataset_range(dataset)
 
         start = start or available_end - pd.Timedelta(days=1)
@@ -910,28 +936,30 @@ class DatabentoDataClient(LiveMarketDataClient):
 
         pyo3_quotes = await self._http_client.get_range_quotes(
             dataset=dataset,
-            symbols=[instrument_id.symbol.value],
+            symbols=[db_instrument_id.symbol.value],
             start=start.value,
             end=end.value,
         )
 
-        quotes = QuoteTick.from_pyo3_list(pyo3_quotes)
+        db_quotes = QuoteTick.from_pyo3_list(pyo3_quotes)
+        ib_quotes = [q.assign_new_instrument_id(map_instrumentId(q.instrument_id)) for q in db_quotes] # Interactive Brokers compatible instrumentId
 
         self._handle_quote_ticks(
             instrument_id=instrument_id,
-            ticks=quotes,
+            ticks=ib_quotes,
             correlation_id=correlation_id,
         )
 
     async def _request_trade_ticks(
         self,
-        instrument_id: InstrumentId,
+        instrument_id: InstrumentId, # Interactive Brokers compatible instrumentId
         limit: int,
         correlation_id: UUID4,
         start: pd.Timestamp | None = None,
         end: pd.Timestamp | None = None,
     ) -> None:
-        dataset: Dataset = self._loader.get_dataset_for_venue(instrument_id.venue)
+        db_instrument_id = map_instrumentId(instrument_id) # Databento compatible instrumentId
+        dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
         _, available_end = await self._get_dataset_range(dataset)
 
         start = start or available_end - pd.Timedelta(days=1)
@@ -950,28 +978,30 @@ class DatabentoDataClient(LiveMarketDataClient):
 
         pyo3_trades = await self._http_client.get_range_trades(
             dataset=dataset,
-            symbols=[instrument_id.symbol.value],
+            symbols=[db_instrument_id.symbol.value],
             start=start.value,
             end=end.value,
         )
 
-        trades = TradeTick.from_pyo3_list(pyo3_trades)
+        db_trades = TradeTick.from_pyo3_list(pyo3_trades)
+        ib_trades = [t.assign_new_instrument_id(map_instrumentId(t.instrument_id)) for t in db_trades] # Interactive Brokers compatible instrumentId
 
         self._handle_trade_ticks(
             instrument_id=instrument_id,
-            ticks=trades,
+            ticks=ib_trades,
             correlation_id=correlation_id,
         )
 
     async def _request_bars(
         self,
-        bar_type: BarType,
+        bar_type: BarType, # bar types with Interactive Brokers compatible instrumentId
         limit: int,
         correlation_id: UUID4,
         start: pd.Timestamp | None = None,
         end: pd.Timestamp | None = None,
     ) -> None:
-        dataset: Dataset = self._loader.get_dataset_for_venue(bar_type.instrument_id.venue)
+        db_instrument_id = map_instrumentId(bar_type.instrument_id)
+        dataset: Dataset = self._loader.get_dataset_for_venue(db_instrument_id.venue)
         _, available_end = await self._get_dataset_range(dataset)
 
         start = start or available_end - pd.Timedelta(days=1)
@@ -990,7 +1020,7 @@ class DatabentoDataClient(LiveMarketDataClient):
 
         pyo3_bars = await self._http_client.get_range_bars(
             dataset=dataset,
-            symbols=[bar_type.instrument_id.symbol.value],
+            symbols=[db_instrument_id.symbol.value],
             aggregation=nautilus_pyo3.BarAggregation(
                 bar_aggregation_to_str(bar_type.spec.aggregation),
             ),
@@ -998,11 +1028,12 @@ class DatabentoDataClient(LiveMarketDataClient):
             end=end.value,
         )
 
-        bars = Bar.from_pyo3_list(pyo3_bars)
+        db_bars = Bar.from_pyo3_list(pyo3_bars)
+        ib_bars = [b.assign_new_instrument_id(map_instrumentId(b.instrument_id)) for b in db_bars]
 
         self._handle_bars(
             bar_type=bar_type,
-            bars=bars,
+            bars=ib_bars,
             partial=None,  # No partials
             correlation_id=correlation_id,
         )
@@ -1013,13 +1044,14 @@ class DatabentoDataClient(LiveMarketDataClient):
     ) -> None:
         # TODO: Improve the efficiency of this
         if isinstance(record, nautilus_pyo3.InstrumentStatus):
-            data = InstrumentStatus.from_pyo3(record)
+            data = InstrumentStatus.from_pyo3(record) # contains Databento compatible instrumentId
+            data.assign_new_instrument_id(map_instrumentId(data.instrument_id))
         elif isinstance(record, DatabentoImbalance):
-            instrument_id = InstrumentId.from_str(record.instrument_id.value)
-            data = DataType(DatabentoImbalance, metadata={"instrument_id": instrument_id})
+            db_instrument_id = InstrumentId.from_str(record.instrument_id.value)
+            data = DataType(DatabentoImbalance, metadata={"instrument_id": map_instrumentId(db_instrument_id)})
         elif isinstance(record, DatabentoStatistics):
-            instrument_id = InstrumentId.from_str(record.instrument_id.value)
-            data = DataType(DatabentoStatistics, metadata={"instrument_id": instrument_id})
+            db_instrument_id = InstrumentId.from_str(record.instrument_id.value)
+            data = DataType(DatabentoStatistics, metadata={"instrument_id": map_instrumentId(db_instrument_id)})
         else:
             raise RuntimeError(f"Cannot handle pyo3 record `{record!r}`")
 
@@ -1033,4 +1065,10 @@ class DatabentoDataClient(LiveMarketDataClient):
         # and eventually be garbage collected. The contained pointer
         # to `Data` is still owned and managed by Rust.
         data = capsule_to_data(pycapsule)
+        if isinstance(data, CustomData):
+            pass
+        else:
+            # map Databento compatible instrumentId to Interactive Brokers compatible instrumentId
+            data.assign_new_instrument_id(map_instrumentId(data.instrument_id))
+
         self._handle_data(data)
