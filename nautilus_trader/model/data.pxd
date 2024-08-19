@@ -286,8 +286,6 @@ cdef class OrderBookDeltas(Data):
     cpdef to_capsule(self)
     cpdef to_pyo3(self)
 
-    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id)
-
 
 cdef class OrderBookDepth10(Data):
     cdef OrderBookDepth10_t _mem

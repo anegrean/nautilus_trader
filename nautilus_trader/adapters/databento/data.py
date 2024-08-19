@@ -46,6 +46,7 @@ from nautilus_trader.model.data import DataType
 from nautilus_trader.model.data import InstrumentStatus
 from nautilus_trader.model.data import QuoteTick
 from nautilus_trader.model.data import TradeTick
+from nautilus_trader.model.data import OrderBookDeltas
 from nautilus_trader.model.data import CustomData
 from nautilus_trader.model.data import capsule_to_data
 from nautilus_trader.model.enums import BookType
@@ -1061,11 +1062,17 @@ class DatabentoDataClient(LiveMarketDataClient):
         self,
         pycapsule: object,
     ) -> None:
+        
         # The capsule will fall out of scope at the end of this method,
         # and eventually be garbage collected. The contained pointer
         # to `Data` is still owned and managed by Rust.
         data = capsule_to_data(pycapsule)
+
         if isinstance(data, CustomData):
+            pass
+        elif isinstance(data, OrderBookDeltas):
+            # note: InstrumentId should be remapped to Interactive Brokers compatible instrumentId
+            # but implementation requires changes to the Rust code and is not yet supported
             pass
         else:
             # map Databento compatible instrumentId to Interactive Brokers compatible instrumentId

@@ -706,7 +706,7 @@ cdef class BarType:
             The new instrument ID to assign.
 
         """
-        self._mem.instrument_id = instrument_id
+        self._mem.instrument_id = instrument_id._mem
 
     @property
     def instrument_id(self) -> InstrumentId:
@@ -1364,7 +1364,7 @@ cdef class Bar(Data):
         return self._mem.open.raw == self._mem.high.raw == self._mem.low.raw == self._mem.close.raw
 
     cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
-        self._mem.bar_type._mem.instrument_id = instrument_id
+        self._mem.bar_type._mem.instrument_id = instrument_id._mem
 
 
 
@@ -2322,7 +2322,7 @@ cdef class OrderBookDelta(Data):
         return output
 
     cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
-        self._mem.instrument_id = instrument_id
+        self._mem.instrument_id = instrument_id._mem
 
 
 cdef class OrderBookDeltas(Data):
@@ -2604,10 +2604,6 @@ cdef class OrderBookDeltas(Data):
         capsule = self.to_capsule()
         deltas = nautilus_pyo3.OrderBookDeltas.from_pycapsule(capsule)
         return deltas
-
-    cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
-        self.instrument_id = instrument_id
-
 
 cdef class OrderBookDepth10(Data):
     """
@@ -3081,7 +3077,7 @@ cdef class OrderBookDepth10(Data):
         return output
 
     cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
-        self._mem.instrument_id = instrument_id
+        self._mem.instrument_id = instrument_id._mem
 
 
 cdef class InstrumentStatus(Data):
@@ -3549,7 +3545,7 @@ cdef class QuoteTick(Data):
             The new instrument ID.
 
         """
-        self._mem.instrument_id = instrument_id
+        self._mem.instrument_id = instrument_id._mem
 
     @property
     def instrument_id(self) -> InstrumentId:
@@ -4158,7 +4154,7 @@ cdef class TradeTick(Data):
 
     cpdef void assign_new_instrument_id(self, InstrumentId instrument_id):
         """
-        Assign a new instrument ID to the quote tick.
+        Assign a new instrument ID to the trade tick.
 
         Parameters
         ----------
@@ -4166,7 +4162,7 @@ cdef class TradeTick(Data):
             The new instrument ID.
 
         """
-        self._mem.instrument_id = instrument_id
+        self._mem.instrument_id = instrument_id._mem
 
     @property
     def instrument_id(self) -> InstrumentId:
