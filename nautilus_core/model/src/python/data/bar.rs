@@ -192,7 +192,7 @@ impl Bar {
 
         let vwap_py: &PyAny = obj.getattr("vwap")?;
         let vwap_raw: i64 = close_py.getattr("raw")?.extract()?;
-        let vwap = Price::from_raw(vwap_raw, price_prec).map_err(to_pyvalue_err)?;
+        let vwap = Price::from_raw(vwap_raw, price_prec);
 
 
         let volume_py: &PyAny = obj.getattr("volume")?;
